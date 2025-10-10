@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+// ✅ Vert pétrole
+const vertPetrole = Color(0xFF006A6A);
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -64,8 +67,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
-            /// ✅ Les petits points d’indicateur
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -76,17 +77,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: _currentPage == index ? 16 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: _currentPage == index
-                        ? Colors.blueAccent
-                        : Colors.grey,
+                    color: _currentPage == index ? vertPetrole : Colors.grey,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            /// ✅ Boutons Suivant / Commencer
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30.0),
               child: SizedBox(
@@ -94,7 +91,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_currentPage == onboardingData.length - 1) {
-                      // 👉 Aller vers Login à la fin
                       Navigator.pushReplacementNamed(context, "/login");
                     } else {
                       _controller.nextPage(
@@ -104,7 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
+                    backgroundColor: vertPetrole,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

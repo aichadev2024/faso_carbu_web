@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/DashboardService.dart';
+import '../services/push_notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-/// ------------------------------------------------------------
-/// DASHBOARD GESTIONNAIRE — Design Coloré & Moderne (2025)
-/// ------------------------------------------------------------
 class DashboardGestionnaireScreen extends StatefulWidget {
   const DashboardGestionnaireScreen({super.key});
 
@@ -16,6 +15,10 @@ class DashboardGestionnaireScreen extends StatefulWidget {
 class _DashboardGestionnaireScreenState
     extends State<DashboardGestionnaireScreen> {
   int _selectedIndex = 0;
+  String userFullName = '';
+  int userCount = 0;
+  int stationCount = 0;
+  int vehiculeCount = 0;
 
   final List<_NavItem> _navItems = const [
     _NavItem('Tableau de bord', Icons.dashboard_outlined, '/dashboard'),
@@ -32,34 +35,115 @@ class _DashboardGestionnaireScreenState
     _NavItem('Demandes', Icons.pending_actions_outlined, '/demandes'),
   ];
 
-  void _navigateTo(String route, String jwtToken) {
-    Navigator.pushNamed(context, route, arguments: {'jwtToken': jwtToken});
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDashboardData();
+      _setupPushNotifications();
+      _listenToNotifications();
+    });
+  }
+
+  Future<void> _setupPushNotifications() async {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final jwtToken = args?['jwtToken'] ?? '';
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId') ?? '';
+
+    final pushService = PushNotificationService();
+    final fcmToken = await pushService.getTokenSafe();
+
+    if (fcmToken != null && userId.isNotEmpty) {
+      await pushService.sendTokenToBackend(
+        fcmToken: fcmToken,
+        userId: userId,
+        jwtToken: jwtToken,
+      );
+    }
+  }
+
+  void _listenToNotifications() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null) {
+        final title = message.notification!.title ?? '';
+        final body = message.notification!.body ?? '';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("$title : $body"),
+            duration: const Duration(seconds: 3),
+            backgroundColor: const Color(0xFF003B46),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _loadDashboardData() async {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final jwtToken = args?['jwtToken'] ?? '';
+
+    final prefs = await SharedPreferences.getInstance();
+    final firstName = prefs.getString('prenom') ?? '';
+    final lastName = prefs.getString('nom') ?? '';
+    setState(() {
+      userFullName = '$firstName $lastName';
+    });
+
+    final service = DashboardService(
+      baseUrl: 'https://faso-carbu-backend-2.onrender.com',
+    );
+
+    try {
+      final users = await service.getUserCount(jwtToken);
+      final stations = await service.getStationCount(jwtToken);
+      final vehicules = await service.getVehiculeCount(jwtToken);
+
+      setState(() {
+        userCount = users;
+        stationCount = stations;
+        vehiculeCount = vehicules;
+      });
+    } catch (e) {
+      debugPrint('Erreur récupération dashboard: $e');
+    }
   }
 
   void _selectNav(int index, String jwtToken) {
     setState(() => _selectedIndex = index);
-    _navigateTo(_navItems[index].route, jwtToken);
+    Navigator.pushNamed(
+      context,
+      _navItems[index].route,
+      arguments: {'jwtToken': jwtToken},
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final jwtToken = args?['jwtToken'] ?? '';
-
     final isWide = MediaQuery.of(context).size.width >= 1100;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: Colors.white,
       body: Row(
         children: [
-          /// 🟦 Sidebar modernisée
+          /// 🌊 Sidebar bleu pétrole
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: isWide ? 240 : 200,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF1E3A8A), Color(0xFF233E94)],
+                colors: [
+                  Color(0xFF003B46),
+                  Color(0xFF07575B),
+                  Color(0xFF0E9AA7),
+                ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -71,62 +155,69 @@ class _DashboardGestionnaireScreenState
             ),
           ),
 
-          /// 🧡 Contenu principal
+          /// Contenu principal
           Expanded(
             child: Column(
               children: [
-                /// Header stylisé
+                /// 🧭 Header
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    color: Color(0xFF0E9AA7),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 4,
+                        color: Colors.black26,
+                        blurRadius: 6,
                         offset: Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.dashboard, color: Color(0xFF1E3A8A)),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "Tableau de bord",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          color: Colors.black87,
-                        ),
+                      Row(
+                        children: const [
+                          Icon(Icons.dashboard, color: Colors.white),
+                          SizedBox(width: 10),
+                          Text(
+                            "Tableau de bord",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-                      const Spacer(),
                       Row(
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
-                            children: const [
+                            children: [
                               Text(
-                                "Diarrassouba Aïcha",
-                                style: TextStyle(
+                                userFullName.isNotEmpty
+                                    ? userFullName
+                                    : "Chargement...",
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: Colors.white,
                                 ),
                               ),
-                              Text(
+                              const Text(
                                 "Gestionnaire",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.black54,
+                                  color: Colors.white70,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(width: 10),
                           PopupMenuButton<String>(
+                            color: const Color(0xFF07575B),
                             onSelected: (value) async {
                               final prefs =
                                   await SharedPreferences.getInstance();
@@ -153,18 +244,24 @@ class _DashboardGestionnaireScreenState
                             itemBuilder: (context) => const [
                               PopupMenuItem(
                                 value: 'profil',
-                                child: Text('Profil'),
+                                child: Text(
+                                  'Profil',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: 'logout',
-                                child: Text('Déconnexion'),
+                                child: Text(
+                                  'Déconnexion',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ),
                             ],
                             child: Row(
                               children: const [
                                 CircleAvatar(
                                   radius: 22,
-                                  backgroundColor: Color(0xFF1E3A8A),
+                                  backgroundColor: Color(0xFF003B46),
                                   child: Icon(
                                     Icons.person,
                                     color: Colors.white,
@@ -172,7 +269,7 @@ class _DashboardGestionnaireScreenState
                                 ),
                                 Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: Colors.black87,
+                                  color: Colors.white,
                                 ),
                               ],
                             ),
@@ -183,14 +280,13 @@ class _DashboardGestionnaireScreenState
                   ),
                 ),
 
-                /// 🟩 Corps du dashboard
+                /// Corps
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        /// Cartes colorées
                         GridView.count(
                           shrinkWrap: true,
                           crossAxisCount: isWide ? 3 : 2,
@@ -198,30 +294,29 @@ class _DashboardGestionnaireScreenState
                           mainAxisSpacing: 16,
                           physics: const NeverScrollableScrollPhysics(),
                           childAspectRatio: 2.5,
-                          children: const [
+                          children: [
                             DashboardCardModern(
-                              color: Color(0xFF1E3A8A),
+                              color: const Color(0xFF003B46),
                               icon: Icons.people,
                               title: "Utilisateurs",
-                              number: "128",
+                              number: "$userCount",
                             ),
                             DashboardCardModern(
-                              color: Color(0xFFFFB300),
+                              color: const Color(0xFF07575B),
                               icon: Icons.local_gas_station,
                               title: "Stations",
-                              number: "42",
+                              number: "$stationCount",
                             ),
                             DashboardCardModern(
-                              color: Color(0xFF43A047),
+                              color: const Color(0xFF0E9AA7),
                               icon: Icons.directions_car,
                               title: "Véhicules",
-                              number: "85",
+                              number: "$vehiculeCount",
                             ),
                           ],
                         ),
                         const SizedBox(height: 24),
 
-                        /// Bouton tickets
                         ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pushNamed(
@@ -233,7 +328,7 @@ class _DashboardGestionnaireScreenState
                           icon: const Icon(Icons.qr_code),
                           label: const Text("Voir mes tickets"),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
+                            backgroundColor: const Color(0xFF003B46),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 14,
@@ -245,11 +340,10 @@ class _DashboardGestionnaireScreenState
                         ),
                         const SizedBox(height: 24),
 
-                        /// Graphique + notifications
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            /// Graphique
+                            /// 📊 Rapports
                             Expanded(
                               flex: 2,
                               child: Container(
@@ -260,80 +354,29 @@ class _DashboardGestionnaireScreenState
                                   boxShadow: const [
                                     BoxShadow(
                                       color: Colors.black12,
-                                      blurRadius: 10,
+                                      blurRadius: 8,
                                       offset: Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
+                                  children: const [
+                                    Text(
                                       "Rapports mensuels",
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
+                                        color: Color(0xFF003B46),
                                       ),
                                     ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      height: 240,
-                                      child: BarChart(
-                                        BarChartData(
-                                          gridData: FlGridData(show: false),
-                                          borderData: FlBorderData(show: false),
-                                          titlesData: FlTitlesData(
-                                            leftTitles: AxisTitles(
-                                              sideTitles: SideTitles(
-                                                showTitles: false,
-                                              ),
-                                            ),
-                                            bottomTitles: AxisTitles(
-                                              sideTitles: SideTitles(
-                                                showTitles: true,
-                                                getTitlesWidget: (value, _) {
-                                                  const months = [
-                                                    "Jan",
-                                                    "Fév",
-                                                    "Mar",
-                                                    "Avr",
-                                                    "Mai",
-                                                  ];
-                                                  if (value.toInt() <
-                                                      months.length) {
-                                                    return Text(
-                                                      months[value.toInt()],
-                                                    );
-                                                  }
-                                                  return const Text("");
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                          barGroups: List.generate(5, (i) {
-                                            return BarChartGroupData(
-                                              x: i,
-                                              barRods: [
-                                                BarChartRodData(
-                                                  toY: 20 + i * 5,
-                                                  gradient:
-                                                      const LinearGradient(
-                                                        colors: [
-                                                          Color(0xFFFFB74D),
-                                                          Color(0xFFFF9800),
-                                                        ],
-                                                        begin:
-                                                            Alignment.topCenter,
-                                                        end: Alignment
-                                                            .bottomCenter,
-                                                      ),
-                                                  width: 18,
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                              ],
-                                            );
-                                          }),
+                                    SizedBox(height: 16),
+                                    Center(
+                                      child: Text(
+                                        "📈 Rapport en préparation...",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey,
                                         ),
                                       ),
                                     ),
@@ -341,9 +384,10 @@ class _DashboardGestionnaireScreenState
                                 ),
                               ),
                             ),
+
                             const SizedBox(width: 20),
 
-                            /// Notifications
+                            /// 🔔 Notifications
                             Expanded(
                               flex: 1,
                               child: Container(
@@ -354,7 +398,7 @@ class _DashboardGestionnaireScreenState
                                   boxShadow: const [
                                     BoxShadow(
                                       color: Colors.black12,
-                                      blurRadius: 10,
+                                      blurRadius: 8,
                                       offset: Offset(0, 4),
                                     ),
                                   ],
@@ -367,6 +411,7 @@ class _DashboardGestionnaireScreenState
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
+                                        color: Color(0xFF003B46),
                                       ),
                                     ),
                                     SizedBox(height: 16),
@@ -383,13 +428,6 @@ class _DashboardGestionnaireScreenState
                                       subtitle:
                                           "Une station a signalé un problème",
                                       color: Colors.orange,
-                                    ),
-                                    NotificationTile(
-                                      icon: Icons.info_outline,
-                                      title: "Info système",
-                                      subtitle:
-                                          "Nouvelle mise à jour disponible",
-                                      color: Colors.indigo,
                                     ),
                                   ],
                                 ),
@@ -410,9 +448,6 @@ class _DashboardGestionnaireScreenState
   }
 }
 
-/// ===================================================
-/// UI Components Modernes
-/// ===================================================
 class CustomSidebar extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
@@ -435,6 +470,7 @@ class CustomSidebar extends StatelessWidget {
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 24,
+            letterSpacing: 1.2,
           ),
         ),
         const SizedBox(height: 30),
@@ -467,16 +503,23 @@ class CustomSidebar extends StatelessWidget {
                     children: [
                       Icon(
                         item.icon,
-                        color: Colors.white.withOpacity(selected ? 1 : 0.8),
+                        color: selected
+                            ? const Color(0xFF0E9AA7)
+                            : Colors.white70,
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        item.title,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(selected ? 1 : 0.8),
-                          fontWeight: selected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                      Flexible(
+                        child: Text(
+                          item.title,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: selected
+                                ? const Color(0xFF0E9AA7)
+                                : Colors.white70,
+                            fontWeight: selected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
                         ),
                       ),
                     ],
@@ -491,9 +534,6 @@ class CustomSidebar extends StatelessWidget {
   }
 }
 
-/// ===================================================
-/// Widgets Modernes (Cards & Notifications)
-/// ===================================================
 class DashboardCardModern extends StatelessWidget {
   final Color color;
   final IconData icon;
@@ -511,7 +551,7 @@ class DashboardCardModern extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
@@ -524,27 +564,30 @@ class DashboardCardModern extends StatelessWidget {
             child: Icon(icon, color: Colors.white, size: 26),
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: Colors.black87,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              Text(
-                number,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: color,
+                Text(
+                  number,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -586,7 +629,7 @@ class NotificationTile extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Color(0xFF003B46),
                   ),
                 ),
                 Text(
@@ -602,13 +645,9 @@ class NotificationTile extends StatelessWidget {
   }
 }
 
-/// ===================================================
-/// Navigation Item
-/// ===================================================
 class _NavItem {
   final String title;
   final IconData icon;
   final String route;
-
   const _NavItem(this.title, this.icon, this.route);
 }

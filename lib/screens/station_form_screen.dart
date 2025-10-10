@@ -4,7 +4,7 @@ import '../providers/station_provider.dart';
 import '../dtos/station_avec_admin_request.dart';
 
 class StationFormScreen extends StatefulWidget {
-  final String jwtToken; // 👈 le token est transmis depuis l'écran parent
+  final String jwtToken;
 
   const StationFormScreen({Key? key, required this.jwtToken}) : super(key: key);
 
@@ -18,14 +18,16 @@ class _StationFormScreenState extends State<StationFormScreen> {
   final _nomStation = TextEditingController();
   final _adresseStation = TextEditingController();
   final _villeStation = TextEditingController();
-
   final _nomAdmin = TextEditingController();
   final _prenomAdmin = TextEditingController();
   final _emailAdmin = TextEditingController();
-  final _mdpAdmin = TextEditingController();
   final _telAdmin = TextEditingController();
+  final _mdpAdmin = TextEditingController();
+  final _confirmMdp = TextEditingController();
 
   bool _isLoading = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   @override
   void dispose() {
@@ -35,8 +37,9 @@ class _StationFormScreenState extends State<StationFormScreen> {
     _nomAdmin.dispose();
     _prenomAdmin.dispose();
     _emailAdmin.dispose();
-    _mdpAdmin.dispose();
     _telAdmin.dispose();
+    _mdpAdmin.dispose();
+    _confirmMdp.dispose();
     super.dispose();
   }
 
@@ -56,20 +59,18 @@ class _StationFormScreenState extends State<StationFormScreen> {
     );
 
     try {
-      await Provider.of<StationProvider>(context, listen: false).addStation(
-        request,
-        jwtToken: widget.jwtToken, // ✅ envoi toujours le token ici
-      );
+      await Provider.of<StationProvider>(
+        context,
+        listen: false,
+      ).addStation(request, jwtToken: widget.jwtToken);
 
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Station + Admin créés avec succès'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.teal,
         ),
       );
-
       _formKey.currentState!.reset();
     } catch (e) {
       if (!mounted) return;
@@ -85,6 +86,8 @@ class _StationFormScreenState extends State<StationFormScreen> {
     String label,
     TextEditingController ctrl, {
     bool obscure = false,
+    bool showToggle = false,
+    VoidCallback? onToggle,
     TextInputType type = TextInputType.text,
     IconData icon = Icons.edit,
   }) {
@@ -92,16 +95,31 @@ class _StationFormScreenState extends State<StationFormScreen> {
       controller: ctrl,
       obscureText: obscure,
       keyboardType: type,
-      validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
+      validator: (v) {
+        if (v == null || v.isEmpty) return 'Champ requis';
+        if (ctrl == _confirmMdp && v != _mdpAdmin.text) {
+          return 'Les mots de passe ne correspondent pas';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.cyan.shade700),
+        prefixIcon: Icon(icon, color: Colors.teal.shade700),
+        suffixIcon: showToggle
+            ? IconButton(
+                icon: Icon(
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.teal.shade600,
+                ),
+                onPressed: onToggle,
+              )
+            : null,
         filled: true,
-        fillColor: Colors.cyan.shade50,
+        fillColor: Colors.teal.shade50,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.cyan.shade400, width: 2),
+          borderSide: BorderSide(color: Colors.teal.shade400, width: 2),
         ),
       ),
     );
@@ -115,12 +133,12 @@ class _StationFormScreenState extends State<StationFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Créer Station + Admin'),
-        backgroundColor: Colors.cyan.shade400,
+        backgroundColor: Colors.teal.shade600,
       ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.cyan.shade50, Colors.white],
+            colors: [Colors.teal.shade50, Colors.white],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -132,7 +150,7 @@ class _StationFormScreenState extends State<StationFormScreen> {
               constraints: const BoxConstraints(maxWidth: 800),
               child: Card(
                 elevation: 10,
-                shadowColor: Colors.cyan.withValues(alpha: 0.4),
+                shadowColor: Colors.teal.withValues(alpha: 0.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -143,13 +161,12 @@ class _StationFormScreenState extends State<StationFormScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Section Station
                         Text(
                           'Informations Station',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.cyan.shade700,
+                            color: Colors.teal.shade700,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -179,15 +196,14 @@ class _StationFormScreenState extends State<StationFormScreen> {
                           icon: Icons.location_on,
                         ),
                         const SizedBox(height: 20),
-                        Divider(color: Colors.cyan.shade200, thickness: 1.5),
+                        Divider(color: Colors.teal.shade300, thickness: 1.5),
                         const SizedBox(height: 10),
-                        // Section Admin
                         Text(
                           'Informations Admin',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.cyan.shade700,
+                            color: Colors.teal.shade700,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -226,8 +242,22 @@ class _StationFormScreenState extends State<StationFormScreen> {
                         _input(
                           'Mot de passe',
                           _mdpAdmin,
-                          obscure: true,
+                          obscure: !_showPassword,
+                          showToggle: true,
+                          onToggle: () =>
+                              setState(() => _showPassword = !_showPassword),
                           icon: Icons.lock,
+                        ),
+                        const SizedBox(height: 12),
+                        _input(
+                          'Confirmer mot de passe',
+                          _confirmMdp,
+                          obscure: !_showConfirmPassword,
+                          showToggle: true,
+                          onToggle: () => setState(
+                            () => _showConfirmPassword = !_showConfirmPassword,
+                          ),
+                          icon: Icons.lock_outline,
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
@@ -241,13 +271,13 @@ class _StationFormScreenState extends State<StationFormScreen> {
                                   : 'Créer Station + Admin',
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.cyan.shade400,
+                              backgroundColor: Colors.teal.shade600,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              elevation: 5,
-                              shadowColor: Colors.cyan.withValues(alpha: 0.5),
+                              elevation: 6,
+                              shadowColor: Colors.teal.withValues(alpha: 0.4),
                             ),
                           ),
                         ),

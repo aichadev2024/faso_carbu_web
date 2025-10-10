@@ -29,12 +29,12 @@ class TicketService {
       Uri.parse("$baseUrl$endpoint"),
       headers: {
         "Authorization": "Bearer $token",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
       },
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
       return data.map((json) => Ticket.fromJson(json)).toList();
     } else {
       throw Exception("❌ Erreur chargement tickets: ${response.body}");
@@ -47,11 +47,14 @@ class TicketService {
 
     final response = await http.put(
       url,
-      headers: {"Authorization": "Bearer $token"},
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json; charset=UTF-8",
+      },
     );
 
     if (response.statusCode == 200) {
-      return; // OK ✅
+      return;
     } else if (response.statusCode == 403) {
       throw Exception(
         "⛔ Vous n’avez pas l’autorisation d’attribuer un ticket (seul un gestionnaire peut le faire).",

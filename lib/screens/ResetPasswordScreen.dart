@@ -16,7 +16,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
+  bool _obscure1 = true;
+  bool _obscure2 = true;
   bool _loading = false;
   String? _message;
 
@@ -46,7 +47,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': widget.email,
-          'code': code, // code OTP reçu par mail
+          'code': code,
           'nouveauMotDePasse': password,
         }),
       );
@@ -56,7 +57,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           _message = "✅ Mot de passe réinitialisé avec succès";
         });
 
-        // Redirection vers login après 2 secondes
         Future.delayed(const Duration(seconds: 2), () {
           Navigator.pushReplacementNamed(context, '/login');
         });
@@ -77,94 +77,158 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 800;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Réinitialiser mot de passe"),
-        backgroundColor: const Color(0xFF00BFFF),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Entrez le code reçu par email et choisissez un nouveau mot de passe.",
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-
-            TextField(
-              controller: _codeController,
-              decoration: InputDecoration(
-                labelText: "Code OTP",
-                prefixIcon: const Icon(Icons.key),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF003B46), Color(0xFF07575B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Container(
+              width: isSmall ? double.infinity : 600,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1.5,
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Nouveau mot de passe",
-                prefixIcon: const Icon(Icons.lock),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: "Confirmer mot de passe",
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            if (_message != null)
-              Text(
-                _message!,
-                style: TextStyle(
-                  color: _message!.startsWith("✅") ? Colors.green : Colors.red,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _resetPassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00BFFF),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 15,
+                    offset: const Offset(0, 6),
                   ),
-                ),
-                child: _loading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Réinitialiser",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                ],
+              ),
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                children: [
+                  Image.asset('assets/images/Image.web.png', height: 90),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Réinitialiser le mot de passe",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF003B46),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Entrez le code reçu par email et votre nouveau mot de passe.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 20),
+
+                  TextField(
+                    controller: _codeController,
+                    decoration: InputDecoration(
+                      labelText: "Code OTP",
+                      prefixIcon: const Icon(Icons.key_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscure1,
+                    decoration: InputDecoration(
+                      labelText: "Nouveau mot de passe",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscure1 ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () => setState(() => _obscure1 = !_obscure1),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscure2,
+                    decoration: InputDecoration(
+                      labelText: "Confirmer mot de passe",
+                      prefixIcon: const Icon(Icons.lock),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscure2 ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () => setState(() => _obscure2 = !_obscure2),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  if (_message != null)
+                    Text(
+                      _message!,
+                      style: TextStyle(
+                        color: _message!.startsWith("✅")
+                            ? Colors.green
+                            : Colors.redAccent,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _resetPassword,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF003B46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: _loading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Réinitialiser",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/login'),
+                    child: const Text(
+                      "Retour à la connexion",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

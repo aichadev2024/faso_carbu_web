@@ -17,7 +17,8 @@ class DemandeService {
 
     if (response.statusCode == 200) {
       print("✅ Réponse demandes: ${response.body}");
-      final List data = jsonDecode(response.body);
+      // ✅ Forcer le décodage UTF-8 pour corriger les accents
+      final List data = jsonDecode(utf8.decode(response.bodyBytes));
       return data.map((d) => Demande.fromJson(d)).toList();
     } else {
       print("❌ Erreur HTTP: ${response.statusCode} - ${response.body}");
@@ -43,7 +44,7 @@ class DemandeService {
     final response = await http.post(
       Uri.parse('$baseUrl/api/demandes'),
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8', // ✅ forcer UTF-8
         'Authorization': 'Bearer $jwtToken',
       },
       body: jsonEncode(body),
@@ -55,21 +56,21 @@ class DemandeService {
   }
 
   // ===================== Valider une demande =====================
-  // ===================== Valider une demande =====================
   Future<void> validateDemande({
     required int demandeId,
-    required String chauffeurId, // 🚀 ajout
+    required String chauffeurId,
     required String jwtToken,
   }) async {
+    final url = Uri.parse(
+      '$baseUrl/api/gestionnaires/demandes/$demandeId/valider?chauffeurId=$chauffeurId',
+    );
+
     final response = await http.post(
-      Uri.parse('$baseUrl/api/gestionnaires/demandes/$demandeId/valider'),
+      url,
       headers: {
         'Authorization': 'Bearer $jwtToken',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8',
       },
-      body: jsonEncode({
-        "chauffeurId": chauffeurId, // 🚀 on envoie le chauffeur choisi
-      }),
     );
 
     if (response.statusCode != 200) {
@@ -87,7 +88,7 @@ class DemandeService {
       Uri.parse('$baseUrl/api/gestionnaires/demandes/$demandeId/rejeter'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8', // ✅
       },
       body: jsonEncode({"motif": motif}),
     );

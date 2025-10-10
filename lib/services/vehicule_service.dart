@@ -7,18 +7,17 @@ class VehiculeService {
   static const String _baseUrl =
       'https://faso-carbu-backend-2.onrender.com/api';
 
-  // ✅ Récupérer tous les véhicules
   Future<List<Vehicule>> getAllVehicules({required String jwtToken}) async {
     final res = await http.get(
       Uri.parse('$_baseUrl/vehicules'),
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         "Authorization": "Bearer $jwtToken",
       },
     );
 
     if (res.statusCode == 200) {
-      final List data = jsonDecode(res.body);
+      final List data = jsonDecode(utf8.decode(res.bodyBytes));
       return data.map((json) => Vehicule.fromJson(json)).toList();
     } else {
       throw Exception(
@@ -27,17 +26,16 @@ class VehiculeService {
     }
   }
 
-  // ✅ Créer un véhicule
   Future<void> createVehicule(
     VehiculeRequest v, {
     required String jwtToken,
   }) async {
-    final body = jsonEncode(v.toJson());
+    final body = utf8.encode(jsonEncode(v.toJson()));
 
     final res = await http.post(
       Uri.parse('$_baseUrl/vehicules/ajouter'),
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8',
         'Authorization': 'Bearer $jwtToken',
       },
       body: body,
@@ -50,18 +48,17 @@ class VehiculeService {
     }
   }
 
-  // ✅ Mettre à jour un véhicule
   Future<void> updateVehicule(
     String id,
     VehiculeRequest v, {
     required String jwtToken,
   }) async {
-    final body = jsonEncode(v.toJson());
+    final body = utf8.encode(jsonEncode(v.toJson()));
 
     final res = await http.put(
       Uri.parse('$_baseUrl/vehicules/$id'),
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=UTF-8',
         'Authorization': 'Bearer $jwtToken',
       },
       body: body,
@@ -74,12 +71,11 @@ class VehiculeService {
     }
   }
 
-  // ✅ Supprimer un véhicule
   Future<void> deleteVehicule(String id, {required String jwtToken}) async {
     final res = await http.delete(
       Uri.parse('$_baseUrl/vehicules/$id'),
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         "Authorization": "Bearer $jwtToken",
       },
     );

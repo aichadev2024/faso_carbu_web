@@ -4,8 +4,11 @@ import '../providers/vehicule_provider.dart';
 import '../dtos/vehicule_request.dart';
 import 'vehicule_form_screen.dart';
 
+// ✅ Vert pétrole
+const vertPetrole = Color(0xFF006A6A);
+
 class VehiculeListScreen extends StatefulWidget {
-  final String jwtToken; // token requis depuis le login
+  final String jwtToken;
   const VehiculeListScreen({super.key, required this.jwtToken});
 
   @override
@@ -44,7 +47,7 @@ class _VehiculeListScreenState extends State<VehiculeListScreen> {
       appBar: AppBar(
         title: const Text("Mes véhicules"),
         centerTitle: true,
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: vertPetrole,
       ),
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
@@ -94,7 +97,7 @@ class _VehiculeListScreenState extends State<VehiculeListScreen> {
                                 IconButton(
                                   icon: const Icon(
                                     Icons.edit,
-                                    color: Colors.blueAccent,
+                                    color: vertPetrole,
                                   ),
                                   onPressed: () {
                                     Navigator.push(
@@ -142,7 +145,7 @@ class _VehiculeListScreenState extends State<VehiculeListScreen> {
             ),
           );
         },
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: vertPetrole,
         child: const Icon(Icons.add),
       ),
     );

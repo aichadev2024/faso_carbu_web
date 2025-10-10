@@ -4,7 +4,7 @@ import 'station_form_screen.dart';
 import '../providers/station_provider.dart';
 
 class StationListScreen extends StatefulWidget {
-  final String jwtToken; // 👈 ajoute le token ici pour le passer au provider
+  final String jwtToken;
 
   const StationListScreen({Key? key, required this.jwtToken}) : super(key: key);
 
@@ -17,13 +17,10 @@ class _StationListScreenState extends State<StationListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final stationProvider = Provider.of<StationProvider>(
+      Provider.of<StationProvider>(
         context,
         listen: false,
-      );
-
-      // ✅ plus de setJwtToken
-      stationProvider.loadStations(jwtToken: widget.jwtToken);
+      ).loadStations(jwtToken: widget.jwtToken);
     });
   }
 
@@ -36,6 +33,7 @@ class _StationListScreenState extends State<StationListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Stations'),
+        backgroundColor: Colors.teal.shade600,
         actions: [
           IconButton(
             tooltip: 'Ajouter Station',
@@ -44,29 +42,23 @@ class _StationListScreenState extends State<StationListScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => StationFormScreen(
-                    jwtToken: widget.jwtToken, // ✅ passage du token
-                  ),
+                  builder: (_) => StationFormScreen(jwtToken: widget.jwtToken),
                 ),
               );
-              await stationProvider.loadStations(
-                jwtToken: widget.jwtToken,
-              ); // ✅ token obligatoire
+              await stationProvider.loadStations(jwtToken: widget.jwtToken);
             },
           ),
         ],
-        backgroundColor: Colors.deepPurpleAccent,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Message de bienvenue
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.deepPurpleAccent.shade100,
+                color: Colors.teal.shade300,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
@@ -80,8 +72,6 @@ class _StationListScreenState extends State<StationListScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Liste ou loading
             Expanded(
               child: loading
                   ? const Center(child: CircularProgressIndicator())
@@ -123,7 +113,6 @@ class _StationListScreenState extends State<StationListScreen> {
                                   style: const TextStyle(fontSize: 14),
                                 ),
                                 const SizedBox(height: 6),
-                                // Badge état actif
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
@@ -131,8 +120,8 @@ class _StationListScreenState extends State<StationListScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: s.actif
-                                        ? Colors.green.shade300
-                                        : Colors.red.shade300,
+                                        ? Colors.green.shade400
+                                        : Colors.red.shade400,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -151,11 +140,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                 IconButton(
                                   icon: const Icon(
                                     Icons.edit,
-                                    color: Colors.blueAccent,
+                                    color: Colors.teal,
                                   ),
-                                  onPressed: () {
-                                    // TODO: Écran édition station
-                                  },
+                                  onPressed: () {},
                                 ),
                                 IconButton(
                                   icon: const Icon(
@@ -166,10 +153,8 @@ class _StationListScreenState extends State<StationListScreen> {
                                     try {
                                       await stationProvider.removeStation(
                                         s.id,
-                                        jwtToken: widget
-                                            .jwtToken, // ✅ token obligatoire
+                                        jwtToken: widget.jwtToken,
                                       );
-
                                       if (mounted) {
                                         ScaffoldMessenger.of(
                                           context,

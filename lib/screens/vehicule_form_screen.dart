@@ -4,6 +4,9 @@ import '../dtos/vehicule_request.dart';
 import '../models/carburant.dart';
 import '../providers/vehicule_provider.dart';
 
+// ✅ Définition de la couleur vert pétrole
+const vertPetrole = Color(0xFF006A6A);
+
 class VehiculeFormScreen extends StatefulWidget {
   final String? id;
   final VehiculeRequest? vehiculeRequest;
@@ -51,9 +54,7 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
 
   Future<void> loadCarburants() async {
     final service = CarburantService();
-    final list = await service.getAllCarburants(
-      jwtToken: widget.jwtToken,
-    ); // ✅ ajout token
+    final list = await service.getAllCarburants(jwtToken: widget.jwtToken);
     setState(() {
       carburants = list;
       if (selectedCarburant != null) {
@@ -79,7 +80,7 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
           widget.id == null ? "Ajouter un véhicule" : "Modifier le véhicule",
         ),
         centerTitle: true,
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: vertPetrole,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -162,7 +163,7 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            backgroundColor: Colors.blueAccent,
+                            backgroundColor: vertPetrole,
                           ),
                           onPressed: () {
                             if (_formKey.currentState!.validate()) {
@@ -174,30 +175,25 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
                                 quotaCarburant:
                                     double.tryParse(_quotaController.text) ?? 0,
                                 carburantId: selectedCarburant!.id.toString(),
-                                userId: "1", // à remplacer par un vrai userId
+                                userId: "1",
                               );
 
                               if (widget.id == null) {
-                                // Ajout
                                 vehiculeProvider.addVehicule(
                                   vehiculeRequest,
-                                  jwtToken:
-                                      widget.jwtToken, // 👈 passage du token
+                                  jwtToken: widget.jwtToken,
                                 );
                               } else {
-                                // Edition
                                 vehiculeProvider.editVehicule(
                                   widget.id!,
                                   vehiculeRequest,
-                                  jwtToken:
-                                      widget.jwtToken, // 👈 passage du token
+                                  jwtToken: widget.jwtToken,
                                 );
                               }
 
                               Navigator.pop(context);
                             }
                           },
-
                           child: Text(
                             widget.id == null ? "Enregistrer" : "Mettre à jour",
                             style: const TextStyle(fontSize: 16),

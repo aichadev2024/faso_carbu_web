@@ -19,8 +19,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _emailCtrl = TextEditingController();
   final _telCtrl = TextEditingController();
   final _mdpCtrl = TextEditingController();
+  final _confirmMdpCtrl = TextEditingController();
+
   role_model.Role? _selectedRole = role_model.Role.DEMANDEUR;
   bool get isEdit => widget.existing != null;
+
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
   @override
   void initState() {
@@ -42,6 +47,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _emailCtrl.dispose();
     _telCtrl.dispose();
     _mdpCtrl.dispose();
+    _confirmMdpCtrl.dispose();
     super.dispose();
   }
 
@@ -49,9 +55,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     final provider = context.read<UserProvider>();
     final payload = User(
-      id: isEdit
-          ? widget.existing!.id
-          : null, // 🔹 important : null pour création
+      id: isEdit ? widget.existing!.id : null,
       nom: _nomCtrl.text.trim(),
       prenom: _prenomCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
@@ -66,7 +70,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Utilisateur modifié avec succès'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.teal,
           ),
         );
       } else {
@@ -75,7 +79,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Utilisateur créé avec succès'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.teal,
           ),
         );
       }
@@ -91,33 +95,30 @@ class _UserFormScreenState extends State<UserFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isLoading = context.watch<UserProvider>().loading;
+    const petrol = Color(0xFF07575B);
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.cyan.shade400,
+        backgroundColor: petrol,
         title: Text(
           isEdit ? 'Modifier un utilisateur' : 'Créer un utilisateur',
+          style: const TextStyle(color: Colors.white),
         ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.cyan.shade50, Colors.white],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        color: Colors.white,
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 600),
               child: Card(
-                elevation: 10,
+                elevation: 12,
+                shadowColor: petrol.withValues(alpha: 0.3),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                shadowColor: Colors.cyan.withValues(alpha: 0.4),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Form(
@@ -126,16 +127,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
                       children: [
                         Text(
                           isEdit
-                              ? 'Modifiez les informations de l’utilisateur'
-                              : 'Bienvenue ! Remplissez le formulaire pour créer un nouvel utilisateur',
+                              ? 'Modifier les informations de l’utilisateur'
+                              : 'Créer un nouvel utilisateur',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.cyan.shade700,
+                            color: petrol,
                           ),
                         ),
                         const SizedBox(height: 24),
+
                         // Nom & Prénom
                         Row(
                           children: [
@@ -143,10 +145,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               child: _input(
                                 label: 'Nom',
                                 controller: _nomCtrl,
+                                icon: Icons.badge,
                                 validator: (v) => v == null || v.isEmpty
                                     ? 'Le nom est requis'
                                     : null,
-                                icon: Icons.badge,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -154,15 +156,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               child: _input(
                                 label: 'Prénom',
                                 controller: _prenomCtrl,
+                                icon: Icons.person_outline,
                                 validator: (v) => v == null || v.isEmpty
                                     ? 'Le prénom est requis'
                                     : null,
-                                icon: Icons.person_outline,
                               ),
                             ),
                           ],
                         ),
+
                         const SizedBox(height: 16),
+
                         // Email & Téléphone
                         Row(
                           children: [
@@ -170,16 +174,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               child: _input(
                                 label: 'Email',
                                 controller: _emailCtrl,
+                                icon: Icons.email,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (v) {
-                                  if (v == null || v.isEmpty)
+                                  if (v == null || v.isEmpty) {
                                     return 'L\'email est requis';
+                                  }
                                   final ok = RegExp(
                                     r'^[^@]+@[^@]+\.[^@]+$',
                                   ).hasMatch(v);
                                   return ok ? null : 'Email invalide';
                                 },
-                                icon: Icons.email,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -187,24 +192,29 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               child: _input(
                                 label: 'Téléphone',
                                 controller: _telCtrl,
+                                icon: Icons.phone,
                                 keyboardType: TextInputType.phone,
                                 validator: (v) => v == null || v.isEmpty
                                     ? 'Le téléphone est requis'
                                     : null,
-                                icon: Icons.phone,
                               ),
                             ),
                           ],
                         ),
+
                         const SizedBox(height: 16),
+
                         // Rôle
                         DropdownButtonFormField<role_model.Role>(
                           value: _selectedRole,
                           decoration: InputDecoration(
                             labelText: 'Rôle',
-                            prefixIcon: const Icon(Icons.admin_panel_settings),
+                            prefixIcon: const Icon(
+                              Icons.admin_panel_settings,
+                              color: petrol,
+                            ),
                             filled: true,
-                            fillColor: Colors.cyan.shade50,
+                            fillColor: Colors.teal.shade50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide.none,
@@ -222,22 +232,47 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           validator: (v) =>
                               v == null ? 'Le rôle est requis' : null,
                         ),
+
                         const SizedBox(height: 16),
-                        // Mot de passe
-                        if (!isEdit)
-                          _input(
+
+                        // Mot de passe & confirmation
+                        if (!isEdit) ...[
+                          _passwordInput(
                             label: 'Mot de passe',
                             controller: _mdpCtrl,
-                            obscureText: true,
+                            obscureText: !_showPassword,
+                            onToggle: () =>
+                                setState(() => _showPassword = !_showPassword),
                             validator: (v) {
-                              if (v == null || v.isEmpty)
+                              if (v == null || v.isEmpty) {
                                 return 'Mot de passe requis';
-                              if (v.length < 6) return 'Minimum 6 caractères';
+                              }
+                              if (v.length < 6) {
+                                return 'Minimum 6 caractères';
+                              }
                               return null;
                             },
-                            icon: Icons.lock,
                           ),
+                          const SizedBox(height: 16),
+                          _passwordInput(
+                            label: 'Confirmer le mot de passe',
+                            controller: _confirmMdpCtrl,
+                            obscureText: !_showConfirmPassword,
+                            onToggle: () => setState(
+                              () =>
+                                  _showConfirmPassword = !_showConfirmPassword,
+                            ),
+                            validator: (v) {
+                              if (v != _mdpCtrl.text) {
+                                return 'Les mots de passe ne correspondent pas';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+
                         const SizedBox(height: 24),
+
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
@@ -245,13 +280,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
                             icon: const Icon(Icons.save),
                             label: Text(isEdit ? 'Enregistrer' : 'Créer'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.cyan.shade400,
+                              backgroundColor: petrol,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              elevation: 5,
-                              shadowColor: Colors.cyan.withValues(alpha: 0.5),
+                              elevation: 6,
                             ),
                           ),
                         ),
@@ -267,28 +301,60 @@ class _UserFormScreenState extends State<UserFormScreen> {
     );
   }
 
+  // Champ texte générique
   Widget _input({
     required String label,
     required TextEditingController controller,
     String? Function(String?)? validator,
-    bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     required IconData icon,
   }) {
+    const petrol = Color(0xFF07575B);
     return TextFormField(
       controller: controller,
       validator: validator,
-      obscureText: obscureText,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.cyan.shade700),
+        prefixIcon: Icon(icon, color: petrol),
         filled: true,
-        fillColor: Colors.cyan.shade50,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-        focusedBorder: OutlineInputBorder(
+        fillColor: Colors.teal.shade50,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.cyan.shade400, width: 2),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  // Champ mot de passe avec icône œil
+  Widget _passwordInput({
+    required String label,
+    required TextEditingController controller,
+    required bool obscureText,
+    required VoidCallback onToggle,
+    String? Function(String?)? validator,
+  }) {
+    const petrol = Color(0xFF07575B);
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.lock, color: petrol),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility_off : Icons.visibility,
+            color: petrol,
+          ),
+          onPressed: onToggle,
+        ),
+        filled: true,
+        fillColor: Colors.teal.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
       ),
     );

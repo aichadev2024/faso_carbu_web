@@ -20,12 +20,16 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
   final TextEditingController prenomController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController motDePasseController = TextEditingController();
+  final TextEditingController confirmMotDePasseController =
+      TextEditingController();
   final TextEditingController telephoneController = TextEditingController();
   final TextEditingController nomEntrepriseController = TextEditingController();
   final TextEditingController adresseEntrepriseController =
       TextEditingController();
 
   bool _loading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _error;
 
   late AnimationController _animationController;
@@ -51,6 +55,7 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
     prenomController.dispose();
     emailController.dispose();
     motDePasseController.dispose();
+    confirmMotDePasseController.dispose();
     telephoneController.dispose();
     nomEntrepriseController.dispose();
     adresseEntrepriseController.dispose();
@@ -101,6 +106,7 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
     required String label,
     required TextEditingController controller,
     bool obscureText = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
     required IconData icon,
@@ -112,241 +118,294 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.blueAccent),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-        ),
+        prefixIcon: Icon(icon, color: const Color(0xFF003B46)),
+        suffixIcon: suffixIcon,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.blue.shade50.withOpacity(0.3),
+        fillColor: Colors.white.withOpacity(0.9),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 800;
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Column(
-                children: [
-                  /// 🔹 Header avec dégradé
-                  Container(
-                    height: 160,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blueAccent, Colors.purpleAccent],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.vertical(
-                        bottom: Radius.circular(30),
-                      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF003B46), Color(0xFF07575B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Container(
+                width: isSmall ? double.infinity : 800,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          CircleAvatar(
-                            radius: 35,
-                            backgroundColor: Colors.white,
-                            child: Icon(
-                              Icons.local_gas_station,
-                              size: 35,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            "FasoCarbu",
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1.5,
                   ),
-                  const SizedBox(height: 20),
-
-                  /// 🔹 Phrase motivante
-                  const Text(
-                    "Créez votre compte gestionnaire et pilotez vos stations avec simplicité 🚀",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  /// 🔹 Formulaire contenu dans une carte centrée
-                  Card(
-                    elevation: 5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Inscription Gestionnaire',
+                ),
+                child: Flex(
+                  direction: isSmall ? Axis.vertical : Axis.horizontal,
+                  children: [
+                    // Partie gauche branding
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        height: isSmall ? 250 : 420,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF0E9AA7), Color(0xFF003B46)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(25),
+                            bottomLeft: Radius.circular(25),
+                          ),
+                        ),
+                        child: const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text(
+                              "Créer un compte gestionnaire\n\nRejoignez FasoCarbu et pilotez vos stations simplement.",
                               textAlign: TextAlign.center,
                               style: TextStyle(
+                                color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.blueAccent,
                               ),
                             ),
-                            const SizedBox(height: 16),
-
-                            _buildTextField(
-                              label: 'Nom',
-                              controller: nomController,
-                              icon: Icons.person,
-                              validator: (v) => v == null || v.isEmpty
-                                  ? 'Le nom est requis'
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Prénom',
-                              controller: prenomController,
-                              icon: Icons.person_outline,
-                              validator: (v) => v == null || v.isEmpty
-                                  ? 'Le prénom est requis'
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Email',
-                              controller: emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              icon: Icons.email,
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'L\'email est requis';
-                                }
-                                if (!RegExp(
-                                  r"^[^@]+@[^@]+\.[^@]+",
-                                ).hasMatch(v)) {
-                                  return 'Email invalide';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Mot de passe',
-                              controller: motDePasseController,
-                              obscureText: true,
-                              icon: Icons.lock,
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Le mot de passe est requis';
-                                }
-                                if (v.length < 6) {
-                                  return 'Minimum 6 caractères';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Téléphone',
-                              controller: telephoneController,
-                              keyboardType: TextInputType.phone,
-                              icon: Icons.phone,
-                              validator: (v) => v == null || v.isEmpty
-                                  ? 'Le téléphone est requis'
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Nom de l\'entreprise',
-                              controller: nomEntrepriseController,
-                              icon: Icons.business,
-                              validator: (v) => v == null || v.isEmpty
-                                  ? 'Nom de l\'entreprise requis'
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-
-                            _buildTextField(
-                              label: 'Adresse de l\'entreprise',
-                              controller: adresseEntrepriseController,
-                              icon: Icons.location_on,
-                              validator: (v) => v == null || v.isEmpty
-                                  ? 'Adresse de l\'entreprise requise'
-                                  : null,
-                            ),
-                            const SizedBox(height: 18),
-
-                            if (_error != null)
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            const SizedBox(height: 14),
-
-                            ElevatedButton(
-                              onPressed: _loading ? null : _submit,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 20,
-                                ),
-                                backgroundColor: Colors.blueAccent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _loading
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
-                                  : const Text(
-                                      "S'inscrire",
-                                      style: TextStyle(fontSize: 15),
-                                    ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text(
-                                "Retour à la connexion",
-                                style: TextStyle(color: Colors.blueAccent),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
+
+                    // Partie droite (formulaire)
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        padding: const EdgeInsets.all(30),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(25),
+                            bottomRight: Radius.circular(25),
+                          ),
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/Image.web.png',
+                                height: 90,
+                              ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                "Inscription Gestionnaire",
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF003B46),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+
+                              _buildTextField(
+                                label: 'Nom',
+                                controller: nomController,
+                                icon: Icons.person,
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Le nom est requis' : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Prénom',
+                                controller: prenomController,
+                                icon: Icons.person_outline,
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Le prénom est requis' : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Email',
+                                controller: emailController,
+                                icon: Icons.email,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'L\'email est requis';
+                                  }
+                                  if (!RegExp(
+                                    r"^[^@]+@[^@]+\.[^@]+",
+                                  ).hasMatch(v)) {
+                                    return 'Email invalide';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Mot de passe',
+                                controller: motDePasseController,
+                                obscureText: _obscurePassword,
+                                icon: Icons.lock_outline,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
+                                    );
+                                  },
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'Mot de passe requis';
+                                  }
+                                  if (v.length < 6) {
+                                    return 'Minimum 6 caractères';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Confirmer le mot de passe',
+                                controller: confirmMotDePasseController,
+                                obscureText: _obscureConfirmPassword,
+                                icon: Icons.lock,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscureConfirmPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(
+                                      () => _obscureConfirmPassword =
+                                          !_obscureConfirmPassword,
+                                    );
+                                  },
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'Confirmez le mot de passe';
+                                  }
+                                  if (v != motDePasseController.text) {
+                                    return 'Les mots de passe ne correspondent pas';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Téléphone',
+                                controller: telephoneController,
+                                icon: Icons.phone,
+                                keyboardType: TextInputType.phone,
+                                validator: (v) =>
+                                    v!.isEmpty ? 'Téléphone requis' : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Nom de l’entreprise',
+                                controller: nomEntrepriseController,
+                                icon: Icons.business,
+                                validator: (v) => v!.isEmpty
+                                    ? 'Nom de l’entreprise requis'
+                                    : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                label: 'Adresse de l’entreprise',
+                                controller: adresseEntrepriseController,
+                                icon: Icons.location_on,
+                                validator: (v) => v!.isEmpty
+                                    ? 'Adresse de l’entreprise requise'
+                                    : null,
+                              ),
+                              const SizedBox(height: 20),
+
+                              if (_error != null)
+                                Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              const SizedBox(height: 14),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: _loading ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF003B46),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: _loading
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.white,
+                                        )
+                                      : const Text(
+                                          "S'inscrire",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text(
+                                  "Retour à la connexion",
+                                  style: TextStyle(color: Color(0xFF003B46)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

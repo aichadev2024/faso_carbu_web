@@ -5,67 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/push_notification_service.dart';
 import '../services/api_service.dart';
 import 'package:logger/logger.dart';
-import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
-import '../providers/station_provider.dart';
-import '../providers/vehicule_provider.dart';
-import '../providers/demande_provider.dart';
 import 'ForgotPasswordScreen.dart';
 
 var logger = Logger();
 const String baseUrl = 'https://faso-carbu-backend-2.onrender.com/api';
-
-/// Widget pour afficher plusieurs phrases qui changent automatiquement
-class RotatingText extends StatefulWidget {
-  const RotatingText({super.key});
-
-  @override
-  _RotatingTextState createState() => _RotatingTextState();
-}
-
-class _RotatingTextState extends State<RotatingText> {
-  final List<String> messages = [
-    "Bienvenue sur FasoCarbu !\n\nGérez vos tickets carburant en toute simplicité\net restez maître de votre consommation.",
-    "Ravi de vous revoir !\n\nAccédez facilement à vos services\net restez connecté à tout moment.",
-    "Votre mobilité, notre priorité.\n\nConnectez-vous pour continuer.",
-  ];
-
-  int _currentIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    // Change toutes les 5 secondes
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 5));
-      if (!mounted) return false;
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % messages.length;
-      });
-      return true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 800),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      child: Text(
-        messages[_currentIndex],
-        key: ValueKey<int>(_currentIndex),
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -80,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _passwordController = TextEditingController();
   String? _error;
   bool _loading = false;
+  bool _obscurePassword = true; // 👁️ ajout pour gérer la visibilité
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -89,11 +33,11 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 900),
     );
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeIn,
+      curve: Curves.easeInOut,
     );
     _animationController.forward();
   }
@@ -157,25 +101,6 @@ class _LoginScreenState extends State<LoginScreen>
           logger.w("Impossible de récupérer le token FCM Web : $e");
         }
 
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        final vehiculeProvider = Provider.of<VehiculeProvider>(
-          context,
-          listen: false,
-        );
-        final stationProvider = Provider.of<StationProvider>(
-          context,
-          listen: false,
-        );
-        final demandeProvider = Provider.of<DemandeProvider>(
-          context,
-          listen: false,
-        );
-
-        await userProvider.loadUsers();
-        await vehiculeProvider.loadVehicules(jwtToken: jwtToken);
-        await stationProvider.loadStations(jwtToken: jwtToken);
-        await demandeProvider.fetchDemandes(jwtToken);
-
         if (!mounted) return;
         Navigator.pushReplacementNamed(
           context,
@@ -187,11 +112,11 @@ class _LoginScreenState extends State<LoginScreen>
             jsonDecode(response.body)['message'] ?? "Erreur de connexion";
         setState(() => _error = message);
       }
-    } catch (e, stackTrace) {
-      logger.e("Erreur login: $e", e, stackTrace);
+    } catch (e) {
+      logger.e("Erreur login: $e");
       setState(
         () => _error =
-            "Connexion impossible : vérifiez internet ou vos identifiants.",
+            "Connexion impossible : vérifiez votre réseau ou vos identifiants.",
       );
     } finally {
       setState(() => _loading = false);
@@ -200,49 +125,54 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 800;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
+            colors: [Color(0xFF003B46), Color(0xFF07575B)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFB2FEFA), // bleu clair
-              Color(0xFF0ED2F7), // turquoise
-            ],
           ),
         ),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Center(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Container(
-                width: 700,
-                height: 420,
+                width: isSmall ? double.infinity : 800,
                 decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(25),
-                  color: Colors.white.withValues(alpha: 0.1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 12,
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
                   ],
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
                 ),
-                child: Row(
+                child: Flex(
+                  direction: isSmall ? Axis.vertical : Axis.horizontal,
                   children: [
-                    // Partie gauche "Welcome Back" avec texte rotatif
+                    // Partie gauche (branding)
                     Expanded(
                       flex: 1,
                       child: Container(
+                        height: isSmall ? 250 : 420,
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
+                            colors: [Color(0xFF0E9AA7), Color(0xFF003B46)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                           ),
                           borderRadius: BorderRadius.only(
                             topLeft: Radius.circular(25),
@@ -251,18 +181,26 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         child: const Center(
                           child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: RotatingText(),
+                            padding: EdgeInsets.all(20.0),
+                            child: Text(
+                              "Bienvenue sur FasoCarbu\n\nGérez vos tickets carburant efficacement.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
 
-                    // Partie droite Login
+                    // Partie droite (formulaire)
                     Expanded(
                       flex: 1,
                       child: Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(30),
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.only(
@@ -271,57 +209,71 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              "Login",
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                              textAlign: TextAlign.center,
+                            Image.asset(
+                              'assets/images/Image.web.png',
+                              height: 90,
                             ),
                             const SizedBox(height: 20),
 
-                            // Email
+                            const Text(
+                              "Connexion",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF003B46),
+                              ),
+                            ),
+                            const SizedBox(height: 25),
+
                             TextField(
                               controller: _emailController,
                               decoration: InputDecoration(
-                                hintText: 'Email',
-                                prefixIcon: const Icon(Icons.email),
+                                labelText: 'Email',
+                                prefixIcon: const Icon(Icons.email_outlined),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 15),
 
-                            // Mot de passe
+                            // 🔒 Mot de passe avec icône "œil"
                             TextField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: _obscurePassword,
                               decoration: InputDecoration(
-                                hintText: 'Mot de passe',
-                                prefixIcon: const Icon(Icons.lock),
+                                labelText: 'Mot de passe',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
 
-                            const SizedBox(height: 8),
-                            if (_error != null)
+                            if (_error != null) ...[
+                              const SizedBox(height: 8),
                               Text(
                                 _error!,
                                 style: const TextStyle(color: Colors.red),
-                                textAlign: TextAlign.center,
                               ),
+                            ],
 
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 20),
 
-                            // Bouton connexion
                             SizedBox(
                               width: double.infinity,
                               height: 50,
@@ -330,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ? null
                                     : () => _login(context),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF667EEA),
+                                  backgroundColor: const Color(0xFF003B46),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -338,14 +290,13 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: _loading
                                     ? const CircularProgressIndicator(
                                         color: Colors.white,
-                                        strokeWidth: 2,
                                       )
                                     : const Text(
-                                        'Connexion',
+                                        "Se connecter",
                                         style: TextStyle(
-                                          color: Colors.white,
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
+                                          color: Colors.white,
                                         ),
                                       ),
                               ),
@@ -365,15 +316,15 @@ class _LoginScreenState extends State<LoginScreen>
                                   );
                                 },
                                 child: const Text(
-                                  'Mot de passe oublié?',
-                                  style: TextStyle(color: Colors.blue),
+                                  "Mot de passe oublié ?",
+                                  style: TextStyle(color: Colors.blueGrey),
                                 ),
                               ),
                             ),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text("Vous n'avez pas de compte?"),
+                                const Text("Pas de compte ?"),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.pushNamed(
@@ -382,8 +333,8 @@ class _LoginScreenState extends State<LoginScreen>
                                     );
                                   },
                                   child: const Text(
-                                    'S\'inscrire',
-                                    style: TextStyle(color: Colors.red),
+                                    "Créer un compte",
+                                    style: TextStyle(color: Color(0xFF003B46)),
                                   ),
                                 ),
                               ],

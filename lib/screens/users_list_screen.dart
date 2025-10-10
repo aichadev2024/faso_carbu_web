@@ -34,7 +34,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.deepPurple, Colors.indigo],
+              colors: [
+                Color(0xFF00695C),
+                Color(0xFF004D40),
+              ], // vert pétrole foncé
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -57,8 +60,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.deepPurpleAccent, Colors.indigoAccent],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00897B), Color(0xFF004D40)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: const [
@@ -91,7 +94,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                     decoration: InputDecoration(
                       hintText: '🔎 Rechercher par nom, email...',
                       filled: true,
-                      fillColor: Colors.indigo.shade50,
+                      fillColor: Colors.teal.shade50,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
@@ -103,7 +106,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: const Color(0xFF00796B), // vert pétrole
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 14,
@@ -175,7 +178,6 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  // Badge actif/inactif
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: Container(
@@ -208,7 +210,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                     tooltip: 'Modifier',
                                     icon: const Icon(
                                       Icons.edit,
-                                      color: Colors.blueAccent,
+                                      color: Colors.teal,
                                     ),
                                     onPressed: () async {
                                       final res = await Navigator.push(
@@ -292,7 +294,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: const Color(0xFF00796B),
         onPressed: () async {
           final res = await Navigator.push(
             context,

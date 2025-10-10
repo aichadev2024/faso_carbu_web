@@ -9,10 +9,9 @@ class RapportService {
 
   Map<String, String> get _headers => {
     "Authorization": "Bearer $token",
-    "Content-Type": "application/json",
+    "Content-Type": "application/json; charset=UTF-8",
   };
 
-  /// ✅ Récupérer tickets d’un chauffeur
   Future<List<dynamic>> getTicketsParChauffeur(String chauffeurId) async {
     final response = await http.get(
       Uri.parse(
@@ -22,13 +21,12 @@ class RapportService {
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
       throw Exception("Erreur récupération tickets chauffeur");
     }
   }
 
-  /// ✅ Récupérer tickets filtrés par période
   Future<List<dynamic>> getTicketsParChauffeurEtDates(
     String chauffeurId,
     DateTime dateDebut,
@@ -42,13 +40,12 @@ class RapportService {
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
       throw Exception("Erreur récupération tickets chauffeur avec filtre");
     }
   }
 
-  /// ✅ Exporter rapport consommation en PDF
   Future<http.Response> exporterRapportPDF() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/gestionnaires/rapport/consommation'),
@@ -62,7 +59,6 @@ class RapportService {
     }
   }
 
-  /// ✅ Exporter rapport consommation en Excel
   Future<http.Response> exporterRapportExcel() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/gestionnaires/rapport/consommation'),

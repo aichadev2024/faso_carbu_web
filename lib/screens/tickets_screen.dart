@@ -7,6 +7,9 @@ import '../models/user.dart';
 import '../services/ticket_service.dart';
 import '../providers/user_provider.dart';
 
+// ✅ Couleur vert pétrole
+const vertPetrole = Color(0xFF006A6A);
+
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
 
@@ -28,7 +31,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
     return ticketService.getTickets();
   }
 
-  // ================= ATTRIBUER UN TICKET =================
   Future<void> _attribuerTicket(BuildContext context, Ticket t) async {
     if (t.entrepriseId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -93,65 +95,88 @@ class _TicketsScreenState extends State<TicketsScreen> {
     }
   }
 
-  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: vertPetrole.withOpacity(
+        0.05,
+      ), // 🌿 Fond léger vert pétrole
       appBar: AppBar(
         title: const Text("🎟️ Tickets Carburant"),
         centerTitle: true,
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: vertPetrole,
+        elevation: 0,
       ),
       body: FutureBuilder<List<Ticket>>(
         future: _ticketsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: vertPetrole),
+            );
           } else if (snapshot.hasError) {
             return Center(
               child: Text(
-                "Erreur: ${snapshot.error}",
+                "Oops! Une erreur est survenue : ${snapshot.error}",
                 style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
               ),
             );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("Aucun ticket disponible"));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.airplane_ticket, size: 80, color: vertPetrole),
+                  SizedBox(height: 16),
+                  Text(
+                    "Aucun ticket disponible pour le moment 😔",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "Créez-en un nouveau pour attribuer à vos chauffeurs!",
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           final tickets = snapshot.data!;
 
           return ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             itemCount: tickets.length,
             itemBuilder: (context, index) {
               final t = tickets[index];
 
               return Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
-                    // 🔹 Bandeau entreprise + statut
+                    // 🌈 Bandeau entreprise + statut
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.red.shade700,
+                        color: vertPetrole,
                         borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
+                          top: Radius.circular(20),
                         ),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 10,
+                        vertical: 12,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -161,25 +186,26 @@ class _TicketsScreenState extends State<TicketsScreen> {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: (t.statut == "VALIDE")
                                   ? Colors.green
                                   : Colors.orange,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
                               t.statut ?? "-",
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -187,7 +213,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       ),
                     ),
 
-                    // 🔹 Infos principales
+                    // 📝 Infos principales
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -198,12 +224,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: vertPetrole,
                             ),
                           ),
                           const Divider(),
                           Text(
                             "💰 Somme : ${t.somme?.toStringAsFixed(0) ?? '0'} FCFA",
-                          ), // 🔹 affichage
+                          ),
                           Text(
                             "👨 Chauffeur : ${t.utilisateurNom ?? '-'} ${t.utilisateurPrenom ?? ''}",
                           ),
@@ -224,35 +251,38 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       ),
                     ),
 
-                    // 🔹 QR Code + Action
+                    // 🔳 QR Code + Action
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 12,
+                        vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: vertPetrole.withOpacity(0.05),
                         borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(16),
+                          bottom: Radius.circular(20),
                         ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           (t.codeQr != null)
-                              ? QrImageView(data: t.codeQr!, size: 80)
+                              ? QrImageView(data: t.codeQr!, size: 90)
                               : const Icon(
                                   Icons.qr_code,
-                                  color: Colors.grey,
+                                  color: vertPetrole,
                                   size: 40,
                                 ),
-
                           if (t.utilisateurNom == null)
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor: vertPetrole,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
                                 ),
                               ),
                               icon: const Icon(
@@ -261,7 +291,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               ),
                               label: const Text(
                                 "Attribuer",
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               onPressed: () => _attribuerTicket(context, t),
                             ),

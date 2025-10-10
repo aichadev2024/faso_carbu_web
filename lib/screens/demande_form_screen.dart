@@ -19,54 +19,57 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
   String? selectedStation;
   String? selectedVehicule;
   double quantite = 0;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final token = await ApiService.getToken();
+    _loadInitialData();
+  }
 
-      if (context.mounted && token != null) {
-        // Charger données initiales
-        await Provider.of<UserProvider>(context, listen: false).loadUsers();
-        await Provider.of<StationProvider>(
-          context,
-          listen: false,
-        ).loadStations(jwtToken: token);
-        await Provider.of<VehiculeProvider>(
-          context,
-          listen: false,
-        ).loadVehicules(jwtToken: token);
-        await Provider.of<CarburantProvider>(
-          context,
-          listen: false,
-        ).loadCarburants(token);
-        await Provider.of<DemandeProvider>(
-          context,
-          listen: false,
-        ).fetchDemandes(token);
-      }
-    });
+  Future<void> _loadInitialData() async {
+    final token = await ApiService.getToken();
+    if (!mounted || token == null) return;
+
+    setState(() => isLoading = true);
+
+    await Provider.of<UserProvider>(context, listen: false).loadUsers();
+    await Provider.of<StationProvider>(
+      context,
+      listen: false,
+    ).loadStations(jwtToken: token);
+    await Provider.of<VehiculeProvider>(
+      context,
+      listen: false,
+    ).loadVehicules(jwtToken: token);
+    await Provider.of<CarburantProvider>(
+      context,
+      listen: false,
+    ).loadCarburants(token);
+    await Provider.of<DemandeProvider>(
+      context,
+      listen: false,
+    ).fetchDemandes(token);
+
+    if (mounted) setState(() => isLoading = false);
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.indigo),
+      prefixIcon: Icon(icon, color: const Color(0xFF07575B)),
       filled: true,
-      fillColor: Colors.grey.shade50,
+      fillColor: Colors.grey.shade100,
+      labelStyle: const TextStyle(color: Color(0xFF003B46)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: const BorderSide(color: Color(0xFF0E9AA7)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.indigo, width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF07575B), width: 1.5),
       ),
     );
   }
@@ -74,29 +77,35 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final demandeProvider = Provider.of<DemandeProvider>(context);
     final stationProvider = Provider.of<StationProvider>(context);
     final vehiculeProvider = Provider.of<VehiculeProvider>(context);
     final carburantProvider = Provider.of<CarburantProvider>(context);
+    final demandeProvider = Provider.of<DemandeProvider>(context);
 
-    if (userProvider.loading ||
+    if (isLoading ||
+        userProvider.loading ||
         stationProvider.loading ||
         vehiculeProvider.loading ||
         carburantProvider.loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF0E9AA7)),
+        ),
+      );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0E9AA7),
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           "Nouvelle Demande",
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.indigo),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         child: Center(
@@ -107,11 +116,11 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
@@ -123,21 +132,23 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Color(0xFF003B46),
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
 
-                // 🔹 Carburant
+                // Carburant
                 DropdownButtonFormField<String>(
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF003B46)),
                   decoration: _inputDecoration(
                     "Carburant",
                     Icons.local_gas_station,
                   ),
                   items: carburantProvider.carburants
                       .map(
-                        (c) => DropdownMenuItem<String>(
+                        (c) => DropdownMenuItem(
                           value: c.id.toString(),
                           child: Text(c.nom),
                         ),
@@ -148,15 +159,15 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 🔹 Station
+                // Station
                 DropdownButtonFormField<String>(
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF003B46)),
                   decoration: _inputDecoration("Station", Icons.location_on),
                   items: stationProvider.stations
                       .map(
-                        (s) => DropdownMenuItem<String>(
-                          value: s.id,
-                          child: Text(s.nom),
-                        ),
+                        (s) =>
+                            DropdownMenuItem(value: s.id, child: Text(s.nom)),
                       )
                       .toList(),
                   value: selectedStation,
@@ -164,15 +175,17 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 🔹 Véhicule
+                // Véhicule
                 DropdownButtonFormField<String>(
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF003B46)),
                   decoration: _inputDecoration(
                     "Véhicule",
                     Icons.directions_car,
                   ),
                   items: vehiculeProvider.vehicules
                       .map(
-                        (v) => DropdownMenuItem<String>(
+                        (v) => DropdownMenuItem(
                           value: v.id,
                           child: Text(
                             "${v.marque} ${v.modele} (${v.immatriculation})",
@@ -183,14 +196,14 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                   value: selectedVehicule,
                   onChanged: (val) => setState(() => selectedVehicule = val),
                 ),
-
                 const SizedBox(height: 16),
 
-                // 🔹 Quantité
+                // Quantité
                 TextFormField(
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  style: const TextStyle(color: Color(0xFF003B46)),
                   decoration: _inputDecoration(
                     "Quantité (L)",
                     Icons.local_drink,
@@ -200,14 +213,11 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 28),
 
-                // 🔹 Bouton Créer
+                // Bouton
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    icon: const Icon(
-                      Icons.check_circle_outline,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.send_rounded, color: Colors.white),
                     label: const Text(
                       "Créer la demande",
                       style: TextStyle(
@@ -216,44 +226,34 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 6, 7, 8),
+                      backgroundColor: const Color(0xFF07575B),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      elevation: 3,
+                      elevation: 4,
                     ),
                     onPressed: () async {
-                      try {
-                        final token = await ApiService.getToken();
+                      final token = await ApiService.getToken();
 
-                        if (selectedCarburant != null &&
-                            selectedStation != null &&
-                            selectedVehicule != null &&
-                            quantite > 0 &&
-                            token != null) {
-                          await demandeProvider.createDemande(
-                            carburantId: int.parse(selectedCarburant!),
-                            stationId: int.parse(selectedStation!),
-                            vehiculeId: int.parse(selectedVehicule!),
-                            quantite: quantite,
-                            jwtToken: token,
-                          );
-
-                          if (context.mounted) Navigator.pop(context);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Veuillez remplir tous les champs"),
-                              backgroundColor: Colors.redAccent,
-                            ),
-                          );
-                        }
-                      } catch (e) {
+                      if (selectedCarburant != null &&
+                          selectedStation != null &&
+                          selectedVehicule != null &&
+                          quantite > 0 &&
+                          token != null) {
+                        await demandeProvider.createDemande(
+                          carburantId: int.parse(selectedCarburant!),
+                          stationId: int.parse(selectedStation!),
+                          vehiculeId: int.parse(selectedVehicule!),
+                          quantite: quantite,
+                          jwtToken: token,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                      } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("Erreur : $e"),
-                            backgroundColor: Colors.redAccent,
+                          const SnackBar(
+                            content: Text("Veuillez remplir tous les champs"),
+                            backgroundColor: Color(0xFF0E9AA7),
                           ),
                         );
                       }

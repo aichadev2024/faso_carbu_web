@@ -4,7 +4,7 @@ import 'dart:convert';
 
 class ProfilScreen extends StatefulWidget {
   final String jwtToken;
-  final String userId; // ✅ corrigé : String et non int
+  final String userId;
 
   const ProfilScreen({super.key, required this.jwtToken, required this.userId});
 
@@ -65,81 +65,102 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    const petrolGreen = Color(0xFF07575B);
+    const lightTurquoise = Color(0xFF0E9AA7);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: const Color(0xFFF4FAFB),
       appBar: AppBar(
-        title: const Text("Mon Profil 👤"),
-        backgroundColor: Colors.indigo,
-        elevation: 0,
+        title: const Text(
+          "👤 Mon Profil",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        backgroundColor: petrolGreen,
+        elevation: 2,
+        centerTitle: true,
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: lightTurquoise),
+            )
           : userData == null
           ? const Center(
               child: Text(
                 "Impossible de charger le profil ❌",
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.redAccent, fontSize: 16),
               ),
             )
           : Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 700),
+                  constraints: const BoxConstraints(maxWidth: 600),
                   child: Card(
+                    elevation: 6,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    elevation: 5,
+                    shadowColor: Colors.black26,
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(28),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // ✅ Avatar
+                          // ✅ Avatar stylé
                           CircleAvatar(
-                            radius: 50,
-                            backgroundColor: Colors.indigo,
+                            radius: 55,
+                            backgroundColor: lightTurquoise,
                             child: const Icon(
                               Icons.person,
-                              size: 55,
+                              size: 60,
                               color: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 18),
 
                           // ✅ Nom + rôle
                           Text(
                             "${userData!['nom']} ${userData!['prenom']}",
-                            style: theme.textTheme.headlineSmall?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
+                              color: petrolGreen,
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            _formatRole(userData!['role']),
-                            style: const TextStyle(
-                              color: Colors.black54,
-                              fontSize: 14,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: lightTurquoise.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _formatRole(userData!['role']),
+                              style: const TextStyle(
+                                color: lightTurquoise,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
 
                           const SizedBox(height: 30),
 
-                          // ✅ Infos utilisateur
+                          // ✅ Section Infos
                           _buildInfo(Icons.email, "Email", userData!['email']),
-                          const Divider(),
+                          const Divider(thickness: 0.8),
                           _buildInfo(
                             Icons.phone,
                             "Téléphone",
                             userData!['telephone'] ?? "Non renseigné",
                           ),
+                          const Divider(thickness: 0.8),
 
                           const SizedBox(height: 40),
 
-                          // ✅ Boutons action
+                          // ✅ Boutons actions stylés
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -154,10 +175,13 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                 icon: const Icon(Icons.lock_reset),
                                 label: const Text("Changer le mot de passe"),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo,
+                                  backgroundColor: lightTurquoise,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                               ),
@@ -173,10 +197,13 @@ class _ProfilScreenState extends State<ProfilScreen> {
                                 icon: const Icon(Icons.logout),
                                 label: const Text("Déconnexion"),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: Colors.redAccent,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                               ),
@@ -193,18 +220,39 @@ class _ProfilScreenState extends State<ProfilScreen> {
   }
 
   Widget _buildInfo(IconData icon, String label, String value) {
+    const petrolGreen = Color(0xFF07575B);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Icon(icon, color: Colors.indigo),
-          const SizedBox(width: 12),
-          Text(
-            "$label : ",
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Container(
+            decoration: BoxDecoration(
+              color: petrolGreen.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, color: petrolGreen),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.black87)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: petrolGreen,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(color: Colors.black87, fontSize: 15),
+                ),
+              ],
+            ),
           ),
         ],
       ),

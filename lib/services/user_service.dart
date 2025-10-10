@@ -18,7 +18,7 @@ class UserService {
       );
 
       if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
+        final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
         if (decoded is List) {
           return decoded
@@ -47,7 +47,8 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       return User.fromJson(data);
     } else {
       throw Exception("Impossible de récupérer le profil utilisateur");
@@ -68,14 +69,15 @@ class UserService {
     final response = await http.post(
       url,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         if (jwtToken != null) "Authorization": "Bearer $jwtToken",
       },
-      body: jsonEncode(body),
+      body: utf8.encode(jsonEncode(body)),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       return User.fromJson(data);
     } else {
       throw Exception("Erreur lors de la création de l’utilisateur");
@@ -102,14 +104,15 @@ class UserService {
     final response = await http.post(
       url,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         if (jwtToken != null) "Authorization": "Bearer $jwtToken",
       },
-      body: jsonEncode(body),
+      body: utf8.encode(jsonEncode(body)),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       return data['message'] ?? "Utilisateur créé avec succès";
     } else {
       throw Exception("Erreur lors de l’inscription du gestionnaire");
@@ -125,10 +128,10 @@ class UserService {
     final response = await http.put(
       url,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         if (jwtToken != null) "Authorization": "Bearer $jwtToken",
       },
-      body: jsonEncode(body),
+      body: utf8.encode(jsonEncode(body)),
     );
 
     if (response.statusCode != 200) {
@@ -150,6 +153,7 @@ class UserService {
     }
   }
 
+  // 🔹 Récupère les chauffeurs d’une entreprise
   Future<List<User>> getChauffeursByEntreprise(
     String entrepriseId, {
     String? jwtToken,
@@ -159,13 +163,13 @@ class UserService {
     final response = await http.get(
       url,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
         if (jwtToken != null) "Authorization": "Bearer $jwtToken",
       },
     );
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+      final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
       return data
           .map((json) => User.fromJson(json as Map<String, dynamic>))
           .toList();
