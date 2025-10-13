@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/demande_provider.dart';
-import '../providers/user_provider.dart';
 import '../services/api_service.dart';
 import 'demande_form_screen.dart';
 
@@ -129,7 +128,7 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Ligne d’en-tête
+                      // En-tête
                       Row(
                         children: [
                           CircleAvatar(
@@ -173,7 +172,7 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
                       const Divider(color: Colors.black12, thickness: 1),
                       const SizedBox(height: 8),
 
-                      // Station et véhicule
+                      // Station + véhicule
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -196,7 +195,7 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Boutons d’action
+                      // Boutons action
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -210,144 +209,10 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
                             onPressed: _jwtToken == null
                                 ? null
                                 : () async {
-                                    try {
-                                      final userProvider =
-                                          Provider.of<UserProvider>(
-                                            context,
-                                            listen: false,
-                                          );
-                                      final chauffeurs = await userProvider
-                                          .loadChauffeursByEntreprise(
-                                            demande.entrepriseId!,
-                                          );
-
-                                      if (!context.mounted) return;
-
-                                      String? selectedChauffeurId;
-
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => StatefulBuilder(
-                                          builder: (context, setState) {
-                                            return AlertDialog(
-                                              backgroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                              ),
-                                              title: const Text(
-                                                "Attribuer un chauffeur",
-                                                style: TextStyle(
-                                                  color: Color(0xFF003B46),
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              content: chauffeurs.isEmpty
-                                                  ? const Text(
-                                                      "Aucun chauffeur disponible pour cette entreprise.",
-                                                      style: TextStyle(
-                                                        color: Colors.redAccent,
-                                                      ),
-                                                    )
-                                                  : DropdownButtonFormField<
-                                                      String
-                                                    >(
-                                                      decoration:
-                                                          const InputDecoration(
-                                                            labelText:
-                                                                "Chauffeur",
-                                                            labelStyle:
-                                                                TextStyle(
-                                                                  color: Color(
-                                                                    0xFF07575B,
-                                                                  ),
-                                                                ),
-                                                            border:
-                                                                OutlineInputBorder(),
-                                                          ),
-                                                      value:
-                                                          selectedChauffeurId,
-                                                      items: chauffeurs
-                                                          .map(
-                                                            (
-                                                              c,
-                                                            ) => DropdownMenuItem(
-                                                              value: c.id,
-                                                              child: Text(
-                                                                "${c.prenom} ${c.nom}",
-                                                              ),
-                                                            ),
-                                                          )
-                                                          .toList(),
-                                                      onChanged: (v) => setState(
-                                                        () =>
-                                                            selectedChauffeurId =
-                                                                v,
-                                                      ),
-                                                    ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(context),
-                                                  child: const Text(
-                                                    "Annuler",
-                                                    style: TextStyle(
-                                                      color: Colors.black54,
-                                                    ),
-                                                  ),
-                                                ),
-                                                ElevatedButton(
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            const Color(
-                                                              0xFF0E9AA7,
-                                                            ),
-                                                      ),
-                                                  onPressed:
-                                                      selectedChauffeurId ==
-                                                          null
-                                                      ? null
-                                                      : () async {
-                                                          await provider
-                                                              .validateDemande(
-                                                                demande.id,
-                                                                selectedChauffeurId!,
-                                                                _jwtToken!,
-                                                              );
-                                                          if (context.mounted) {
-                                                            Navigator.pop(
-                                                              context,
-                                                            );
-                                                          }
-                                                        },
-                                                  child: const Text(
-                                                    "Valider",
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      debugPrint(
-                                        "Erreur chargement chauffeurs : $e",
-                                      );
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            "⚠️ Erreur lors du chargement des chauffeurs",
-                                          ),
-                                          backgroundColor: Colors.redAccent,
-                                        ),
-                                      );
-                                    }
+                                    await provider.validateDemande(
+                                      demande.id,
+                                      _jwtToken!,
+                                    );
                                   },
                           ),
 

@@ -6,6 +6,7 @@ import '../providers/station_provider.dart';
 import '../providers/vehicule_provider.dart';
 import '../providers/carburant_provider.dart';
 import '../services/api_service.dart';
+import '../models/role.dart';
 
 class DemandeFormScreen extends StatefulWidget {
   const DemandeFormScreen({super.key});
@@ -18,6 +19,7 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
   String? selectedCarburant;
   String? selectedStation;
   String? selectedVehicule;
+  String? selectedChauffeur;
   double quantite = 0;
   bool isLoading = true;
 
@@ -33,23 +35,31 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
 
     setState(() => isLoading = true);
 
-    await Provider.of<UserProvider>(context, listen: false).loadUsers();
-    await Provider.of<StationProvider>(
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final stationProvider = Provider.of<StationProvider>(
       context,
       listen: false,
-    ).loadStations(jwtToken: token);
-    await Provider.of<VehiculeProvider>(
+    );
+    final vehiculeProvider = Provider.of<VehiculeProvider>(
       context,
       listen: false,
-    ).loadVehicules(jwtToken: token);
-    await Provider.of<CarburantProvider>(
+    );
+    final carburantProvider = Provider.of<CarburantProvider>(
       context,
       listen: false,
-    ).loadCarburants(token);
-    await Provider.of<DemandeProvider>(
+    );
+    final demandeProvider = Provider.of<DemandeProvider>(
       context,
       listen: false,
-    ).fetchDemandes(token);
+    );
+
+    await Future.wait([
+      userProvider.loadUsers(),
+      stationProvider.loadStations(jwtToken: token),
+      vehiculeProvider.loadVehicules(jwtToken: token),
+      carburantProvider.loadCarburants(token),
+      demandeProvider.fetchDemandes(token),
+    ]);
 
     if (mounted) setState(() => isLoading = false);
   }
@@ -138,7 +148,7 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Carburant
+                // ===================== CARBURANT =====================
                 DropdownButtonFormField<String>(
                   dropdownColor: Colors.white,
                   style: const TextStyle(color: Color(0xFF003B46)),
@@ -159,15 +169,17 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Station
+                // ===================== STATION =====================
                 DropdownButtonFormField<String>(
                   dropdownColor: Colors.white,
                   style: const TextStyle(color: Color(0xFF003B46)),
                   decoration: _inputDecoration("Station", Icons.location_on),
                   items: stationProvider.stations
                       .map(
-                        (s) =>
-                            DropdownMenuItem(value: s.id, child: Text(s.nom)),
+                        (s) => DropdownMenuItem(
+                          value: s.id.toString(),
+                          child: Text(s.nom),
+                        ),
                       )
                       .toList(),
                   value: selectedStation,
@@ -175,7 +187,7 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Véhicule
+                // ===================== VÉHICULE =====================
                 DropdownButtonFormField<String>(
                   dropdownColor: Colors.white,
                   style: const TextStyle(color: Color(0xFF003B46)),
@@ -186,7 +198,7 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                   items: vehiculeProvider.vehicules
                       .map(
                         (v) => DropdownMenuItem(
-                          value: v.id,
+                          value: v.id.toString(),
                           child: Text(
                             "${v.marque} ${v.modele} (${v.immatriculation})",
                           ),
@@ -198,7 +210,38 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Quantité
+                // ===================== CHAUFFEUR (fixé) =====================
+                Consumer<UserProvider>(
+                  builder: (context, userProvider, _) {
+                    final chauffeurs = userProvider.users
+                        .where((u) => u.role == Role.CHAUFFEUR)
+                        .toList();
+
+                    return DropdownButtonFormField<String>(
+                      dropdownColor: Colors.white,
+                      style: const TextStyle(color: Color(0xFF003B46)),
+                      decoration: _inputDecoration(
+                        "Chauffeur (optionnel)",
+                        Icons.person,
+                      ),
+                      items: chauffeurs
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.id.toString(),
+                              child: Text("${c.nom} ${c.prenom}"),
+                            ),
+                          )
+                          .toList(),
+                      value: selectedChauffeur,
+                      onChanged: chauffeurs.isNotEmpty
+                          ? (val) => setState(() => selectedChauffeur = val)
+                          : null,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // ===================== QUANTITÉ =====================
                 TextFormField(
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -213,7 +256,7 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                 ),
                 const SizedBox(height: 28),
 
-                // Bouton
+                // ===================== BOUTON CRÉER =====================
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -235,24 +278,37 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
                     ),
                     onPressed: () async {
                       final token = await ApiService.getToken();
+                      final currentUser = userProvider.currentUser;
+
+                      // Chauffeur sélectionné ou connecté
+                      final chauffeurId =
+                          selectedChauffeur ??
+                          (currentUser?.role.name.toUpperCase() == "CHAUFFEUR"
+                              ? currentUser!.id.toString()
+                              : null);
 
                       if (selectedCarburant != null &&
                           selectedStation != null &&
                           selectedVehicule != null &&
+                          chauffeurId != null &&
                           quantite > 0 &&
                           token != null) {
                         await demandeProvider.createDemande(
                           carburantId: int.parse(selectedCarburant!),
                           stationId: int.parse(selectedStation!),
                           vehiculeId: int.parse(selectedVehicule!),
+                          chauffeurId: chauffeurId,
                           quantite: quantite,
                           jwtToken: token,
                         );
+
                         if (context.mounted) Navigator.pop(context);
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text("Veuillez remplir tous les champs"),
+                            content: Text(
+                              "Veuillez remplir tous les champs requis.",
+                            ),
                             backgroundColor: Color(0xFF0E9AA7),
                           ),
                         );

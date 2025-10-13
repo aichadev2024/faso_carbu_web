@@ -16,12 +16,9 @@ class DemandeService {
     );
 
     if (response.statusCode == 200) {
-      print("✅ Réponse demandes: ${response.body}");
-      // ✅ Forcer le décodage UTF-8 pour corriger les accents
       final List data = jsonDecode(utf8.decode(response.bodyBytes));
       return data.map((d) => Demande.fromJson(d)).toList();
     } else {
-      print("❌ Erreur HTTP: ${response.statusCode} - ${response.body}");
       throw Exception('Erreur récupération demandes: ${response.body}');
     }
   }
@@ -31,6 +28,7 @@ class DemandeService {
     required int carburantId,
     required int stationId,
     required int vehiculeId,
+    required String chauffeurId,
     required double quantite,
     required String jwtToken,
   }) async {
@@ -38,13 +36,14 @@ class DemandeService {
       "carburantId": carburantId,
       "stationId": stationId,
       "vehiculeId": vehiculeId,
+      "chauffeurId": chauffeurId,
       "quantite": quantite,
     };
 
     final response = await http.post(
       Uri.parse('$baseUrl/api/demandes'),
       headers: {
-        'Content-Type': 'application/json; charset=UTF-8', // ✅ forcer UTF-8
+        'Content-Type': 'application/json; charset=UTF-8',
         'Authorization': 'Bearer $jwtToken',
       },
       body: jsonEncode(body),
@@ -55,14 +54,13 @@ class DemandeService {
     }
   }
 
-  // ===================== Valider une demande =====================
+  // ===================== Valider une demande (sans chauffeurId) =====================
   Future<void> validateDemande({
     required int demandeId,
-    required String chauffeurId,
     required String jwtToken,
   }) async {
     final url = Uri.parse(
-      '$baseUrl/api/gestionnaires/demandes/$demandeId/valider?chauffeurId=$chauffeurId',
+      '$baseUrl/api/gestionnaires/demandes/$demandeId/valider',
     );
 
     final response = await http.post(
@@ -88,7 +86,7 @@ class DemandeService {
       Uri.parse('$baseUrl/api/gestionnaires/demandes/$demandeId/rejeter'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
-        'Content-Type': 'application/json; charset=UTF-8', // ✅
+        'Content-Type': 'application/json; charset=UTF-8',
       },
       body: jsonEncode({"motif": motif}),
     );

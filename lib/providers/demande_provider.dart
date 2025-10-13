@@ -13,6 +13,7 @@ class DemandeProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  // ===================== Charger toutes les demandes =====================
   Future<void> fetchDemandes(String jwtToken) async {
     _isLoading = true;
     _errorMessage = null;
@@ -34,6 +35,7 @@ class DemandeProvider with ChangeNotifier {
     required int carburantId,
     required int stationId,
     required int vehiculeId,
+    required String chauffeurId, // toujours utile ici
     required double quantite,
     required String jwtToken,
   }) async {
@@ -42,10 +44,12 @@ class DemandeProvider with ChangeNotifier {
         carburantId: carburantId,
         stationId: stationId,
         vehiculeId: vehiculeId,
+        chauffeurId: chauffeurId,
         quantite: quantite,
         jwtToken: jwtToken,
       );
 
+      // Rafraîchir la liste après création
       await fetchDemandes(jwtToken);
     } catch (e) {
       _errorMessage = e.toString();
@@ -53,17 +57,11 @@ class DemandeProvider with ChangeNotifier {
     }
   }
 
-  // ===================== Valider une demande =====================
-  // ===================== Valider une demande =====================
-  Future<void> validateDemande(
-    int demandeId,
-    String chauffeurId, // 🚀 ajout
-    String jwtToken,
-  ) async {
+  // ===================== Valider une demande (sans chauffeurId) =====================
+  Future<void> validateDemande(int demandeId, String jwtToken) async {
     try {
       await _demandeService.validateDemande(
         demandeId: demandeId,
-        chauffeurId: chauffeurId, // 🚀 passage au service
         jwtToken: jwtToken,
       );
 

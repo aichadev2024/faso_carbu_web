@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/DashboardService.dart';
@@ -16,6 +17,7 @@ class _DashboardGestionnaireScreenState
     extends State<DashboardGestionnaireScreen> {
   int _selectedIndex = 0;
   String userFullName = '';
+  String userRole = '';
   int userCount = 0;
   int stationCount = 0;
   int vehiculeCount = 0;
@@ -45,6 +47,7 @@ class _DashboardGestionnaireScreenState
     });
   }
 
+  // ================== 🔔 Notifications Push ==================
   Future<void> _setupPushNotifications() async {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -71,6 +74,7 @@ class _DashboardGestionnaireScreenState
         final title = message.notification!.title ?? '';
         final body = message.notification!.body ?? '';
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("$title : $body"),
@@ -82,16 +86,32 @@ class _DashboardGestionnaireScreenState
     });
   }
 
+  // ================== 📊 Charger les données du tableau de bord ==================
   Future<void> _loadDashboardData() async {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
     final jwtToken = args?['jwtToken'] ?? '';
 
     final prefs = await SharedPreferences.getInstance();
-    final firstName = prefs.getString('prenom') ?? '';
-    final lastName = prefs.getString('nom') ?? '';
+
+    // ✅ Correction des accents
+    String decodeUtf8(String value) {
+      try {
+        return utf8.decode(value.runes.toList());
+      } catch (_) {
+        return value;
+      }
+    }
+
+    final firstName = decodeUtf8(prefs.getString('prenom') ?? '');
+    final lastName = decodeUtf8(prefs.getString('nom') ?? '');
+    final role = decodeUtf8(prefs.getString('role') ?? '');
+
+    if (!mounted) return;
     setState(() {
       userFullName = '$firstName $lastName';
+      userRole = role.isNotEmpty ? role : 'Gestionnaire';
     });
 
     final service = DashboardService(
@@ -103,16 +123,18 @@ class _DashboardGestionnaireScreenState
       final stations = await service.getStationCount(jwtToken);
       final vehicules = await service.getVehiculeCount(jwtToken);
 
+      if (!mounted) return;
       setState(() {
         userCount = users;
         stationCount = stations;
         vehiculeCount = vehicules;
       });
     } catch (e) {
-      debugPrint('Erreur récupération dashboard: $e');
+      debugPrint('❌ Erreur récupération dashboard: $e');
     }
   }
 
+  // ================== 🧭 Navigation ==================
   void _selectNav(int index, String jwtToken) {
     setState(() => _selectedIndex = index);
     Navigator.pushNamed(
@@ -122,10 +144,12 @@ class _DashboardGestionnaireScreenState
     );
   }
 
+  // ================== 🖼️ Interface ==================
   @override
   Widget build(BuildContext context) {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
     final jwtToken = args?['jwtToken'] ?? '';
     final isWide = MediaQuery.of(context).size.width >= 1100;
 
@@ -133,7 +157,7 @@ class _DashboardGestionnaireScreenState
       backgroundColor: Colors.white,
       body: Row(
         children: [
-          /// 🌊 Sidebar bleu pétrole
+          /// 🌊 Barre latérale
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: isWide ? 240 : 200,
@@ -155,11 +179,11 @@ class _DashboardGestionnaireScreenState
             ),
           ),
 
-          /// Contenu principal
+          /// 🧭 Contenu principal
           Expanded(
             child: Column(
               children: [
-                /// 🧭 Header
+                /// 🏷️ Header
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -206,9 +230,9 @@ class _DashboardGestionnaireScreenState
                                   color: Colors.white,
                                 ),
                               ),
-                              const Text(
-                                "Gestionnaire",
-                                style: TextStyle(
+                              Text(
+                                userRole.isNotEmpty ? userRole : "Gestionnaire",
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: Colors.white70,
                                 ),
@@ -223,6 +247,7 @@ class _DashboardGestionnaireScreenState
                                   await SharedPreferences.getInstance();
                               if (value == 'profil') {
                                 final userId = prefs.getString('userId');
+                                if (!mounted) return;
                                 Navigator.pushNamed(
                                   context,
                                   '/profil',
@@ -280,7 +305,7 @@ class _DashboardGestionnaireScreenState
                   ),
                 ),
 
-                /// Corps
+                /// 🧮 Corps principal
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -342,97 +367,10 @@ class _DashboardGestionnaireScreenState
 
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            /// 📊 Rapports
-                            Expanded(
-                              flex: 2,
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black12,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    Text(
-                                      "Rapports mensuels",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        color: Color(0xFF003B46),
-                                      ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    Center(
-                                      child: Text(
-                                        "📈 Rapport en préparation...",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(width: 20),
-
-                            /// 🔔 Notifications
-                            Expanded(
-                              flex: 1,
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black12,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    Text(
-                                      "Notifications",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        color: Color(0xFF003B46),
-                                      ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    NotificationTile(
-                                      icon: Icons.check_circle,
-                                      title: "Ticket validé",
-                                      subtitle:
-                                          "Un ticket a été validé avec succès",
-                                      color: Colors.green,
-                                    ),
-                                    NotificationTile(
-                                      icon: Icons.warning_amber_rounded,
-                                      title: "Attention",
-                                      subtitle:
-                                          "Une station a signalé un problème",
-                                      color: Colors.orange,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          children: const [
+                            Expanded(flex: 2, child: _RapportsSection()),
+                            SizedBox(width: 20),
+                            Expanded(flex: 1, child: _NotificationsSection()),
                           ],
                         ),
                       ],
@@ -448,6 +386,7 @@ class _DashboardGestionnaireScreenState
   }
 }
 
+// ================== 📦 Widgets annexes ==================
 class CustomSidebar extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
@@ -588,6 +527,74 @@ class DashboardCardModern extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RapportsSection extends StatelessWidget {
+  const _RapportsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
+      child: const Center(
+        child: Text(
+          "📈 Rapport mensuel en préparation...",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationsSection extends StatelessWidget {
+  const _NotificationsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            "Notifications",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Color(0xFF003B46),
+            ),
+          ),
+          SizedBox(height: 16),
+          NotificationTile(
+            icon: Icons.check_circle,
+            title: "Ticket validé",
+            subtitle: "Un ticket a été validé avec succès",
+            color: Colors.green,
+          ),
+          NotificationTile(
+            icon: Icons.warning_amber_rounded,
+            title: "Attention",
+            subtitle: "Une station a signalé un problème",
+            color: Colors.orange,
           ),
         ],
       ),
