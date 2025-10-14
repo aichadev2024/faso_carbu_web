@@ -434,7 +434,7 @@ class CustomSidebar extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: selected
-                        ? Colors.white.withOpacity(0.15)
+                        ? Colors.white.withValues(alpha: 0.15)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -490,9 +490,9 @@ class DashboardCardModern extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -624,7 +624,7 @@ class NotificationTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: color.withOpacity(0.15),
+            backgroundColor: color.withValues(alpha: 0.15),
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 10),

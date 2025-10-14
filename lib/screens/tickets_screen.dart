@@ -98,8 +98,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: vertPetrole.withOpacity(
-        0.05,
+      backgroundColor: vertPetrole.withValues(
+        alpha: 0.05,
       ), // 🌿 Fond léger vert pétrole
       appBar: AppBar(
         title: const Text("🎟️ Tickets Carburant"),
@@ -158,7 +158,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -258,7 +258,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: vertPetrole.withOpacity(0.05),
+                        color: vertPetrole.withValues(alpha: 0.05),
                         borderRadius: const BorderRadius.vertical(
                           bottom: Radius.circular(20),
                         ),

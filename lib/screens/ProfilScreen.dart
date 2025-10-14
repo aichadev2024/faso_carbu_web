@@ -1,6 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilScreen extends StatefulWidget {
   final String jwtToken;
@@ -15,6 +17,8 @@ class ProfilScreen extends StatefulWidget {
 class _ProfilScreenState extends State<ProfilScreen> {
   Map<String, dynamic>? userData;
   bool isLoading = true;
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -35,16 +39,26 @@ class _ProfilScreenState extends State<ProfilScreen> {
       );
 
       if (response.statusCode == 200) {
+        final decodedBody = utf8.decode(response.bodyBytes);
         setState(() {
-          userData = jsonDecode(response.body);
+          userData = jsonDecode(decodedBody);
           isLoading = false;
         });
       } else {
         throw Exception("Erreur récupération profil: ${response.body}");
       }
     } catch (e) {
-      print("❌ Erreur profil: $e");
+      debugPrint("❌ Erreur profil: $e");
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() => _profileImage = File(picked.path));
+      // 👉 Ici, tu pourrais envoyer la photo au backend :
+      // await uploadProfilePhoto(File(picked.path));
     }
   }
 
@@ -67,17 +81,23 @@ class _ProfilScreenState extends State<ProfilScreen> {
   Widget build(BuildContext context) {
     const petrolGreen = Color(0xFF07575B);
     const lightTurquoise = Color(0xFF0E9AA7);
+    const backgroundColor = Color(0xFFF5F8FA);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4FAFB),
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text(
-          "👤 Mon Profil",
+          "Mon Profil",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: petrolGreen,
-        elevation: 2,
-        centerTitle: true,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: fetchUserProfil,
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(
@@ -90,129 +110,171 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 style: TextStyle(color: Colors.redAccent, fontSize: 16),
               ),
             )
-          : Center(
+          : RefreshIndicator(
+              color: lightTurquoise,
+              onRefresh: fetchUserProfil,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  child: Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    shadowColor: Colors.black26,
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    // ✅ En-tête stylé avec dégradé
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [petrolGreen, lightTurquoise],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // ✅ Avatar stylé
-                          CircleAvatar(
-                            radius: 55,
-                            backgroundColor: lightTurquoise,
-                            child: const Icon(
-                              Icons.person,
-                              size: 60,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-
-                          // ✅ Nom + rôle
-                          Text(
-                            "${userData!['nom']} ${userData!['prenom']}",
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: petrolGreen,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: lightTurquoise.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _formatRole(userData!['role']),
-                              style: const TextStyle(
-                                color: lightTurquoise,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-
-                          // ✅ Section Infos
-                          _buildInfo(Icons.email, "Email", userData!['email']),
-                          const Divider(thickness: 0.8),
-                          _buildInfo(
-                            Icons.phone,
-                            "Téléphone",
-                            userData!['telephone'] ?? "Non renseigné",
-                          ),
-                          const Divider(thickness: 0.8),
-
-                          const SizedBox(height: 40),
-
-                          // ✅ Boutons actions stylés
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Stack(
+                            alignment: Alignment.bottomRight,
                             children: [
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    '/change-password',
-                                    arguments: {"jwtToken": widget.jwtToken},
-                                  );
-                                },
-                                icon: const Icon(Icons.lock_reset),
-                                label: const Text("Changer le mot de passe"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: lightTurquoise,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
+                              CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Colors.white,
+                                backgroundImage: _profileImage != null
+                                    ? FileImage(_profileImage!)
+                                    : (userData!['photoUrl'] != null
+                                          ? NetworkImage(userData!['photoUrl'])
+                                                as ImageProvider
+                                          : const AssetImage(
+                                              'assets/images/avatar_placeholder.png',
+                                            )),
                               ),
-                              const SizedBox(width: 20),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pushNamedAndRemoveUntil(
-                                    context,
-                                    "/",
-                                    (r) => false,
-                                  );
-                                },
-                                icon: const Icon(Icons.logout),
-                                label: const Text("Déconnexion"),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.redAccent,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                              Positioned(
+                                bottom: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: _pickProfileImage,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.all(6),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      color: petrolGreen,
+                                      size: 22,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          Text(
+                            "${userData!['nom']} ${userData!['prenom']}",
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatRole(userData!['role']),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
+
+                    // ✅ Carte infos utilisateur
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        elevation: 8,
+                        shadowColor: Colors.black12,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              _buildInfo(
+                                Icons.email,
+                                "Email",
+                                userData!['email'],
+                              ),
+                              const Divider(),
+                              _buildInfo(
+                                Icons.phone,
+                                "Téléphone",
+                                userData!['telephone'] ?? "Non renseigné",
+                              ),
+                              const Divider(),
+                              _buildInfo(
+                                Icons.account_box,
+                                "Identifiant",
+                                userData!['id'].toString(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // ✅ Boutons stylés
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/change-password',
+                                arguments: {"jwtToken": widget.jwtToken},
+                              );
+                            },
+                            icon: const Icon(Icons.lock_reset),
+                            label: const Text("Changer le mot de passe"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: lightTurquoise,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pushNamedAndRemoveUntil(
+                                context,
+                                "/",
+                                (r) => false,
+                              );
+                            },
+                            icon: const Icon(Icons.logout),
+                            label: const Text("Déconnexion"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -223,18 +285,18 @@ class _ProfilScreenState extends State<ProfilScreen> {
     const petrolGreen = Color(0xFF07575B);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Container(
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: petrolGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: petrolGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            padding: const EdgeInsets.all(8),
             child: Icon(icon, color: petrolGreen),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,12 +306,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: petrolGreen,
+                    fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(color: Colors.black87, fontSize: 15),
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 15,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

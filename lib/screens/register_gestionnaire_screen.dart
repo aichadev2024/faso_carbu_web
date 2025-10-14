@@ -122,7 +122,7 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.9),
+        fillColor: Colors.white.withValues(alpha: 0.9),
       ),
     );
   }
@@ -150,17 +150,17 @@ class _RegisterGestionnaireScreenState extends State<RegisterGestionnaireScreen>
               child: Container(
                 width: isSmall ? double.infinity : 800,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
                   ],
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
                 ),
