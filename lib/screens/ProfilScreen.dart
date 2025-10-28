@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'change_password_screen.dart'; // 👈 Écran de changement de mot de passe
+import 'package:shared_preferences/shared_preferences.dart';
+import 'change_password_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   final String jwtToken;
@@ -16,15 +19,28 @@ class ProfilScreen extends StatefulWidget {
 class _ProfilScreenState extends State<ProfilScreen> {
   Map<String, dynamic>? userData;
   bool isLoading = true;
-
   final Color vertPetrole = const Color(0xFF006666);
 
   @override
   void initState() {
     super.initState();
-    fetchUserProfil();
+    _loadCachedUser();
   }
 
+  /// Charge les infos utilisateur depuis le cache, puis actualise depuis le backend
+  Future<void> _loadCachedUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('userData_${widget.userId}');
+    if (cached != null) {
+      setState(() {
+        userData = jsonDecode(cached);
+        isLoading = false;
+      });
+    }
+    await fetchUserProfil();
+  }
+
+  /// Récupère le profil depuis l’API
   Future<void> fetchUserProfil() async {
     try {
       final response = await http.get(
@@ -38,9 +54,13 @@ class _ProfilScreenState extends State<ProfilScreen> {
       );
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
-          userData = jsonDecode(utf8.decode(response.bodyBytes));
+          userData = data;
         });
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userData_${widget.userId}', jsonEncode(data));
       } else {
         throw Exception("Erreur récupération profil: ${response.body}");
       }
@@ -48,6 +68,71 @@ class _ProfilScreenState extends State<ProfilScreen> {
       debugPrint("❌ Erreur profil: $e");
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  /// Met à jour la photo de profil (compatible Web)
+  Future<void> _changeProfilePhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null) return;
+
+    try {
+      final bytes = await pickedFile.readAsBytes();
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(
+          'https://faso-carbu-backend-2.onrender.com/api/utilisateurs/${widget.userId}/upload-photo',
+        ),
+      );
+
+      final multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: pickedFile.name,
+      );
+
+      request.files.add(multipartFile);
+      request.headers['Authorization'] = 'Bearer ${widget.jwtToken}';
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final respStr = await response.stream.bytesToString();
+        final data = jsonDecode(respStr);
+        String newPhotoUrl = data['photoProfil'];
+
+        // Force reload sur le Web en ajoutant un query param unique
+        newPhotoUrl += '?t=${DateTime.now().millisecondsSinceEpoch}';
+
+        if (mounted) {
+          setState(() {
+            userData!['photoUrl'] = newPhotoUrl;
+          });
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'userData_${widget.userId}',
+          jsonEncode(userData),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Photo de profil mise à jour !')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Échec de la mise à jour de la photo'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur upload photo: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Erreur: $e")));
     }
   }
 
@@ -67,10 +152,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   @override
   Widget build(BuildContext context) {
     const vertPetroleGradient = LinearGradient(
-      colors: [
-        Color(0xFF009999), // clair
-        Color(0xFF006666), // foncé
-      ],
+      colors: [Color(0xFF009999), Color(0xFF006666)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -103,31 +185,64 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Photo
-                      CircleAvatar(
-                        radius: 55,
-                        backgroundImage: userData!['photoUrl'] != null
-                            ? NetworkImage(userData!['photoUrl'])
-                            : const AssetImage(
-                                    'assets/images/avatar_placeholder.png',
-                                  )
-                                  as ImageProvider,
+                      // Photo avec bouton caméra
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundImage:
+                                (userData?['photoUrl'] != null &&
+                                    userData!['photoUrl'].toString().isNotEmpty)
+                                ? NetworkImage(userData!['photoUrl'])
+                                : const AssetImage(
+                                        'assets/images/avatar_placeholder.png',
+                                      )
+                                      as ImageProvider,
+                            onBackgroundImageError: (_, __) {
+                              SchedulerBinding.instance.addPostFrameCallback((
+                                _,
+                              ) {
+                                if (mounted) {
+                                  setState(() {
+                                    userData!['photoUrl'] = null;
+                                  });
+                                }
+                              });
+                            },
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 4,
+                            child: InkWell(
+                              onTap: _changeProfilePhoto,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: vertPetrole,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
-
-                      // Nom complet
                       Text(
-                        "${userData!['nom']} ${userData!['prenom']}",
+                        "${userData?['nom'] ?? ''} ${userData?['prenom'] ?? ''}",
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
                       ),
-
-                      // Rôle
                       Text(
-                        _formatRole(userData!['role']),
+                        _formatRole(userData?['role'] ?? ''),
                         style: TextStyle(
                           color: vertPetrole,
                           fontSize: 16,
@@ -135,24 +250,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Ligne de séparation
                       Container(
                         height: 1,
                         color: Colors.grey[300],
                         margin: const EdgeInsets.symmetric(vertical: 8),
                       ),
-
-                      // Infos utilisateur
-                      _infoText(Icons.email, userData!['email']),
-                      if (userData!['telephone'] != null)
+                      _infoText(Icons.email, userData?['email'] ?? ''),
+                      if (userData?['telephone'] != null)
                         _infoText(Icons.phone, userData!['telephone']),
-                      if (userData!['adresse'] != null)
+                      if (userData?['adresse'] != null)
                         _infoText(Icons.location_on, userData!['adresse']),
-
                       const SizedBox(height: 24),
-
-                      // Bouton changement mot de passe
                       ElevatedButton.icon(
                         onPressed: () {
                           Navigator.push(
