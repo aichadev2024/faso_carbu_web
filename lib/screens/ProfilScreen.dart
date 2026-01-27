@@ -27,7 +27,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
     _loadCachedUser();
   }
 
-  /// Charge les infos utilisateur depuis le cache, puis actualise depuis le backend
   Future<void> _loadCachedUser() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('userData_${widget.userId}');
