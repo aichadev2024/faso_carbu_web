@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:gestionnaire_dashboard/main.dart';
+import 'package:gestionnaire_dashboard/core/widgets/app_widgets.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(GestionnaireDashboardApp());
+  test('statusInfo traduit les statuts backend', () {
+    expect(statusInfo('EN_ATTENTE').label, 'En attente');
+    expect(statusInfo('VALIDEE').tone, Tone.success);
+    expect(statusInfo('REJETER').tone, Tone.danger);
+    expect(statusInfo(null).label, '—');
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('formatNumber sépare les milliers', () {
+    expect(formatNumber(1250000), '1 250 000');
+    expect(formatNumber(12.5, decimals: 1), '12,5');
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('StatusBadge affiche le libellé du statut', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StatusBadge.fromStatus('VALIDEE'))));
+    expect(find.text('Validé'), findsOneWidget);
   });
 }

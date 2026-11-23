@@ -1,660 +1,298 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/DashboardService.dart';
-import '../services/push_notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+
+import '../core/config/app_config.dart';
+import '../core/session.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
+import '../models/demande.dart';
+import '../services/DashboardService.dart';
+import '../services/demande_service.dart';
+import '../services/push_notification_service.dart';
+import 'main_layout.dart';
 
 class DashboardGestionnaireScreen extends StatefulWidget {
   const DashboardGestionnaireScreen({super.key});
 
   @override
-  State<DashboardGestionnaireScreen> createState() =>
-      _DashboardGestionnaireScreenState();
+  State<DashboardGestionnaireScreen> createState() => _DashboardGestionnaireScreenState();
 }
 
-class _DashboardGestionnaireScreenState
-    extends State<DashboardGestionnaireScreen> {
-  int _selectedIndex = 0;
-  String userFullName = '';
-  String userRole = '';
-  int userCount = 0;
-  int stationCount = 0;
-  int vehiculeCount = 0;
+class _DashboardGestionnaireScreenState extends State<DashboardGestionnaireScreen> {
+  final _dashboard = DashboardService(baseUrl: AppConfig.backendUrl);
+  final _demandes = DemandeService();
 
-  final List<_NavItem> _navItems = const [
-    _NavItem('Tableau de bord', Icons.dashboard_outlined, '/dashboard'),
-    _NavItem('Utilisateurs', Icons.people_alt_outlined, '/users'),
-    _NavItem('Stations', Icons.local_gas_station_outlined, '/stations'),
-    _NavItem('Véhicules', Icons.directions_car_filled_outlined, '/vehicules'),
-    _NavItem('Tickets carburant', Icons.qr_code_2_outlined, '/tickets'),
-    _NavItem(
-      'Attributions',
-      Icons.assignment_turned_in_outlined,
-      '/attributions',
-    ),
-    _NavItem('Rapports', Icons.bar_chart_outlined, '/rapports'),
-    _NavItem('Demandes', Icons.pending_actions_outlined, '/demandes'),
-  ];
+  bool _loading = true;
+  String? _error;
+  int _userCount = 0;
+  int _stationCount = 0;
+  int _vehiculeCount = 0;
+  List<Demande> _allDemandes = [];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDashboardData();
-      _setupPushNotifications();
-      _listenToNotifications();
-    });
+    _load();
+    _setupPushNotifications();
   }
 
-  // ================== 🔔 Notifications Push ==================
-  Future<void> _setupPushNotifications() async {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final jwtToken = args?['jwtToken'] ?? '';
-
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId') ?? '';
-
-    final pushService = PushNotificationService();
-    final fcmToken = await pushService.getTokenSafe();
-
-    if (fcmToken != null && userId.isNotEmpty) {
-      await pushService.sendTokenToBackend(
-        fcmToken: fcmToken,
-        userId: userId,
-        jwtToken: jwtToken,
-      );
-    }
-  }
-
-  void _listenToNotifications() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (message.notification != null) {
-        final title = message.notification!.title ?? '';
-        final body = message.notification!.body ?? '';
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("$title : $body"),
-            duration: const Duration(seconds: 3),
-            backgroundColor: const Color(0xFF003B46),
-          ),
-        );
-      }
-    });
-  }
-
-  // ================== 📊 Charger les données du tableau de bord ==================
-  Future<void> _loadDashboardData() async {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-
-    final jwtToken = args?['jwtToken'] ?? '';
-
-    final prefs = await SharedPreferences.getInstance();
-
-    // ✅ Correction des accents
-    String decodeUtf8(String value) {
-      try {
-        return utf8.decode(value.runes.toList());
-      } catch (_) {
-        return value;
-      }
-    }
-
-    final firstName = decodeUtf8(prefs.getString('prenom') ?? '');
-    final lastName = decodeUtf8(prefs.getString('nom') ?? '');
-    final role = decodeUtf8(prefs.getString('role') ?? '');
-
-    if (!mounted) return;
+  Future<void> _load() async {
     setState(() {
-      userFullName = '$firstName $lastName';
-      userRole = role.isNotEmpty ? role : 'Gestionnaire';
+      _loading = true;
+      _error = null;
     });
-
-    final service = DashboardService(
-      baseUrl: 'https://faso-carbu-backend-2.onrender.com',
-    );
-
+    final token = Session.token;
     try {
-      final users = await service.getUserCount(jwtToken);
-      final stations = await service.getStationCount(jwtToken);
-      final vehicules = await service.getVehiculeCount(jwtToken);
-
+      final results = await Future.wait([
+        _dashboard.getUserCount(token),
+        _dashboard.getStationCount(token),
+        _dashboard.getVehiculeCount(token),
+      ]);
+      List<Demande> demandes = [];
+      try {
+        demandes = await _demandes.getAllDemandes(jwtToken: token);
+      } catch (_) {
+        // Les demandes sont un complément : on n'empêche pas l'affichage.
+      }
       if (!mounted) return;
       setState(() {
-        userCount = users;
-        stationCount = stations;
-        vehiculeCount = vehicules;
+        _userCount = results[0];
+        _stationCount = results[1];
+        _vehiculeCount = results[2];
+        _allDemandes = demandes..sort((a, b) => b.id.compareTo(a.id));
       });
     } catch (e) {
-      debugPrint('❌ Erreur récupération dashboard: $e');
+      if (mounted) setState(() => _error = 'Impossible de charger le tableau de bord.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  // ================== 🧭 Navigation ==================
-  void _selectNav(int index, String jwtToken) {
-    setState(() => _selectedIndex = index);
-    Navigator.pushNamed(
-      context,
-      _navItems[index].route,
-      arguments: {'jwtToken': jwtToken},
-    );
+  Future<void> _setupPushNotifications() async {
+    try {
+      final push = PushNotificationService();
+      final fcmToken = await push.getTokenSafe();
+      if (fcmToken != null && Session.userId.isNotEmpty) {
+        await push.sendTokenToBackend(fcmToken: fcmToken, userId: Session.userId, jwtToken: Session.token);
+      }
+      FirebaseMessaging.onMessage.listen((message) {
+        final n = message.notification;
+        if (n == null || !mounted) return;
+        showAppSnack(context, '${n.title ?? ''} — ${n.body ?? ''}', tone: Tone.info);
+        _load();
+      });
+    } catch (e) {
+      debugPrint('Notifications push indisponibles : $e');
+    }
   }
 
-  // ================== 🖼️ Interface ==================
+  int _count(String statut) => _allDemandes.where((d) => d.statut.toUpperCase() == statut).length;
+
+  void _go(String route) => Navigator.pushReplacementNamed(context, route, arguments: Session.routeArgs);
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    return h < 12 ? 'Bonjour' : (h < 18 ? 'Bon après-midi' : 'Bonsoir');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-
-    final jwtToken = args?['jwtToken'] ?? '';
-    final isWide = MediaQuery.of(context).size.width >= 1100;
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Row(
+    return MainLayout(
+      title: 'Tableau de bord',
+      jwtToken: Session.token,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          /// 🌊 Barre latérale
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: isWide ? 240 : 200,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF003B46),
-                  Color(0xFF07575B),
-                  Color(0xFF0E9AA7),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+          PageHeader(
+            title: '$_greeting${Session.prenom.isNotEmpty ? ', ${Session.prenom}' : ''}',
+            subtitle: 'Voici l\'activité carburant de votre entreprise.',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: _loading ? null : _load,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Actualiser'),
               ),
-            ),
-            child: CustomSidebar(
-              items: _navItems,
-              selectedIndex: _selectedIndex,
-              onTap: (i) => _selectNav(i, jwtToken),
-            ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/demandes/form', arguments: Session.routeArgs)
+                    .then((_) => _load()),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Nouvelle demande'),
+              ),
+            ],
           ),
+          if (_error != null)
+            Card(child: ErrorState(message: _error!, onRetry: _load))
+          else if (_loading)
+            const LoadingView(message: 'Chargement des indicateurs…')
+          else ...[
+            ResponsiveGrid(children: [
+              StatCard(
+                label: 'Demandes en attente',
+                value: '${_count('EN_ATTENTE')}',
+                icon: Icons.pending_actions_rounded,
+                tone: Tone.warning,
+                hint: '${_allDemandes.length} demande${_allDemandes.length > 1 ? 's' : ''} au total',
+                onTap: () => _go('/demandes'),
+              ),
+              StatCard(
+                label: 'Utilisateurs',
+                value: '$_userCount',
+                icon: Icons.group_rounded,
+                tone: Tone.info,
+                onTap: () => _go('/users'),
+              ),
+              StatCard(
+                label: 'Stations partenaires',
+                value: '$_stationCount',
+                icon: Icons.local_gas_station_rounded,
+                tone: Tone.brand,
+                onTap: () => _go('/stations'),
+              ),
+              StatCard(
+                label: 'Véhicules',
+                value: '$_vehiculeCount',
+                icon: Icons.directions_car_rounded,
+                tone: Tone.success,
+                onTap: () => _go('/vehicules'),
+              ),
+            ]),
+            const SizedBox(height: AppSpacing.xl),
+            LayoutBuilder(builder: (context, c) {
+              final recent = _RecentDemandes(demandes: _allDemandes.take(6).toList(), onSeeAll: () => _go('/demandes'));
+              final breakdown = _DemandeBreakdown(
+                enAttente: _count('EN_ATTENTE'),
+                validees: _count('VALIDEE'),
+                rejetees: _count('REJETEE'),
+              );
+              if (c.maxWidth < 900) {
+                return Column(children: [recent, const SizedBox(height: AppSpacing.lg), breakdown]);
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 2, child: recent),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(child: breakdown),
+                ],
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
-          /// 🧭 Contenu principal
-          Expanded(
-            child: Column(
+class _RecentDemandes extends StatelessWidget {
+  const _RecentDemandes({required this.demandes, required this.onSeeAll});
+  final List<Demande> demandes;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return AppCard(
+      title: 'Demandes récentes',
+      subtitle: 'Les dernières demandes de carburant',
+      trailing: TextButton(onPressed: onSeeAll, child: const Text('Tout voir')),
+      padding: EdgeInsets.zero,
+      child: demandes.isEmpty
+          ? const EmptyState(
+              icon: Icons.assignment_outlined,
+              title: 'Aucune demande',
+              message: 'Les demandes de vos équipes apparaîtront ici.',
+            )
+          : Column(
               children: [
-                /// 🏷️ Header
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0E9AA7),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.dashboard, color: Colors.white),
-                          SizedBox(width: 10),
-                          Text(
-                            "Tableau de bord",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                for (var i = 0; i < demandes.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+                    child: Row(
+                      children: [
+                        InitialsAvatar(
+                          name: '${demandes[i].demandeurPrenom ?? ''} ${demandes[i].demandeurNom ?? ''}',
+                          size: 34,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                userFullName.isNotEmpty
-                                    ? userFullName
-                                    : "Chargement...",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                '${formatNumber(demandes[i].quantite)} L · ${demandes[i].carburantNom}',
+                                style: t.titleSmall,
                               ),
+                              const SizedBox(height: 2),
                               Text(
-                                userRole.isNotEmpty ? userRole : "Gestionnaire",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
-                                ),
+                                [
+                                  '${demandes[i].demandeurPrenom ?? ''} ${demandes[i].demandeurNom ?? ''}'.trim(),
+                                  demandes[i].vehiculeImmatriculation,
+                                  demandes[i].stationNom,
+                                ].where((s) => s.isNotEmpty).join(' · '),
+                                style: t.bodySmall,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
-                          const SizedBox(width: 10),
-                          PopupMenuButton<String>(
-                            color: const Color(0xFF07575B),
-                            onSelected: (value) async {
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              if (value == 'profil') {
-                                final userId = prefs.getString('userId');
-                                if (!mounted) return;
-                                Navigator.pushNamed(
-                                  context,
-                                  '/profil',
-                                  arguments: {
-                                    'jwtToken': jwtToken,
-                                    'userId': userId,
-                                  },
-                                );
-                              } else if (value == 'logout') {
-                                await prefs.remove('jwtToken');
-                                if (!mounted) return;
-                                Navigator.pushNamedAndRemoveUntil(
-                                  context,
-                                  '/login',
-                                  (route) => false,
-                                );
-                              }
-                            },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem(
-                                value: 'profil',
-                                child: Text(
-                                  'Profil',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'logout',
-                                child: Text(
-                                  'Déconnexion',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                            child: Row(
-                              children: const [
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: Color(0xFF003B46),
-                                  child: Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: Colors.white,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                /// 🧮 Corps principal
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        GridView.count(
-                          shrinkWrap: true,
-                          crossAxisCount: isWide ? 3 : 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.5,
-                          children: [
-                            DashboardCardModern(
-                              color: const Color(0xFF003B46),
-                              icon: Icons.people,
-                              title: "Utilisateurs",
-                              number: "$userCount",
-                            ),
-                            DashboardCardModern(
-                              color: const Color(0xFF07575B),
-                              icon: Icons.local_gas_station,
-                              title: "Stations",
-                              number: "$stationCount",
-                            ),
-                            DashboardCardModern(
-                              color: const Color(0xFF0E9AA7),
-                              icon: Icons.directions_car,
-                              title: "Véhicules",
-                              number: "$vehiculeCount",
-                            ),
-                          ],
                         ),
-                        const SizedBox(height: 24),
-
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/tickets',
-                              arguments: {'jwtToken': jwtToken},
-                            );
-                          },
-                          icon: const Icon(Icons.qr_code),
-                          label: const Text("Voir mes tickets"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF003B46),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Expanded(flex: 2, child: _RapportsSection()),
-                            SizedBox(width: 20),
-                            Expanded(flex: 1, child: _NotificationsSection()),
-                          ],
-                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        StatusBadge.fromStatus(demandes[i].statut),
                       ],
                     ),
                   ),
-                ),
+                ],
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// ================== 📦 Widgets annexes ==================
-class CustomSidebar extends StatelessWidget {
-  final List<_NavItem> items;
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-
-  const CustomSidebar({
-    required this.items,
-    required this.selectedIndex,
-    required this.onTap,
-  });
+class _DemandeBreakdown extends StatelessWidget {
+  const _DemandeBreakdown({required this.enAttente, required this.validees, required this.rejetees});
+  final int enAttente;
+  final int validees;
+  final int rejetees;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 40),
-        const Text(
-          "FasoCarbu",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 30),
-        Expanded(
-          child: ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, i) {
-              final item = items[i];
-              final selected = i == selectedIndex;
-              return InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => onTap(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Colors.white.withValues(alpha: 0.15)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        item.icon,
-                        color: selected
-                            ? const Color(0xFF0E9AA7)
-                            : Colors.white70,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          item.title,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: selected
-                                ? const Color(0xFF0E9AA7)
-                                : Colors.white70,
-                            fontWeight: selected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
+    final t = Theme.of(context).textTheme;
+    final total = enAttente + validees + rejetees;
 
-class DashboardCardModern extends StatelessWidget {
-  final Color color;
-  final IconData icon;
-  final String title;
-  final String number;
-
-  const DashboardCardModern({
-    required this.color,
-    required this.icon,
-    required this.title,
-    required this.number,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: color,
-            child: Icon(icon, color: Colors.white, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Colors.black87,
-                  ),
-                ),
-                Text(
-                  number,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: color,
-                  ),
-                ),
-              ],
+    Widget row(String label, int value, Tone tone) {
+      final ratio = total == 0 ? 0.0 : value / total;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Expanded(child: Text(label, style: t.bodyMedium)),
+              Text('$value', style: t.titleSmall),
+            ]),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 6,
+                color: tone.fg,
+                backgroundColor: tone.softBg(context),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RapportsSection extends StatelessWidget {
-  const _RapportsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
-        ],
-      ),
-      child: const Center(
-        child: Text(
-          "📈 Rapport mensuel en préparation...",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          ],
         ),
-      ),
+      );
+    }
+
+    return AppCard(
+      title: 'Répartition des demandes',
+      subtitle: total == 0 ? 'Aucune donnée' : '$total demande${total > 1 ? 's' : ''}',
+      child: Column(children: [
+        row('En attente', enAttente, Tone.warning),
+        row('Validées', validees, Tone.success),
+        row('Rejetées', rejetees, Tone.danger),
+      ]),
     );
   }
-}
-
-class _NotificationsSection extends StatelessWidget {
-  const _NotificationsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            "Notifications",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xFF003B46),
-            ),
-          ),
-          SizedBox(height: 16),
-          NotificationTile(
-            icon: Icons.check_circle,
-            title: "Ticket validé",
-            subtitle: "Un ticket a été validé avec succès",
-            color: Colors.green,
-          ),
-          NotificationTile(
-            icon: Icons.warning_amber_rounded,
-            title: "Attention",
-            subtitle: "Une station a signalé un problème",
-            color: Colors.orange,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class NotificationTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-
-  const NotificationTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: color.withValues(alpha: 0.15),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF003B46),
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem {
-  final String title;
-  final IconData icon;
-  final String route;
-  const _NavItem(this.title, this.icon, this.route);
 }

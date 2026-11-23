@@ -15,11 +15,12 @@ class Station {
 
   factory Station.fromJson(Map<String, dynamic> json) {
     return Station(
-      id: json['id'].toString(), // ✅ conversion int → String
+      // Le backend expose `id_station` (entité) ou `id` (DTO) selon l'endpoint.
+      id: (json['id'] ?? json['id_station'] ?? json['idStation']).toString(),
       nom: json['nom'] ?? '',
       adresse: json['adresse'] ?? '',
       ville: json['ville'] ?? '',
-      actif: json['actif'] ?? true,
+      actif: json['actif'] ?? ((json['statut'] ?? 'actif').toString().toLowerCase() == 'actif'),
     );
   }
 

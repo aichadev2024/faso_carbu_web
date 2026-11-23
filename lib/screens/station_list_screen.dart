@@ -1,314 +1,188 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'station_form_screen.dart';
+
+import '../core/session.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
+import '../models/station.dart';
 import '../providers/station_provider.dart';
+import 'main_layout.dart';
+import 'station_form_screen.dart';
 
 class StationListScreen extends StatefulWidget {
+  const StationListScreen({super.key, required this.jwtToken});
   final String jwtToken;
-
-  const StationListScreen({Key? key, required this.jwtToken}) : super(key: key);
 
   @override
   State<StationListScreen> createState() => _StationListScreenState();
 }
 
 class _StationListScreenState extends State<StationListScreen> {
-  String _searchQuery = '';
+  String _search = '';
+  String? _error;
+
+  String get _token => widget.jwtToken.isNotEmpty ? widget.jwtToken : Session.token;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<StationProvider>(
-        context,
-        listen: false,
-      ).loadStations(jwtToken: widget.jwtToken);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _error = null);
+    try {
+      await context.read<StationProvider>().loadStations(jwtToken: _token);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Impossible de charger les stations.');
+    }
+  }
+
+  Future<void> _create() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/stations/form'),
+        builder: (_) => StationFormScreen(jwtToken: _token),
+      ),
+    );
+    if (mounted) _load();
+  }
+
+  Future<void> _delete(Station s) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Supprimer « ${s.nom} » ?',
+      message: 'La station et ses carburants ne seront plus proposés dans les demandes.',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await context.read<StationProvider>().removeStation(s.id, jwtToken: _token);
+      if (mounted) showAppSnack(context, 'Station supprimée.', tone: Tone.success);
+    } catch (_) {
+      if (mounted) showAppSnack(context, 'La suppression a échoué.', tone: Tone.danger);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final stationProvider = Provider.of<StationProvider>(context);
-    final stations = stationProvider.stations;
-    final loading = stationProvider.loading;
-
-    // Filtrage local selon la recherche
-    final filteredStations = stations
-        .where(
-          (s) =>
-              s.nom.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              s.ville.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              s.adresse.toLowerCase().contains(_searchQuery.toLowerCase()),
-        )
+    final provider = context.watch<StationProvider>();
+    final q = _search.toLowerCase();
+    final stations = provider.stations
+        .where((s) => '${s.nom} ${s.ville} ${s.adresse}'.toLowerCase().contains(q))
         .toList();
+    final actives = provider.stations.where((s) => s.actif).length;
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.teal.shade700, Colors.teal.shade400],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        title: const Text(
-          'Stations',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
-        ),
-        centerTitle: true,
-      ),
-
-      // Bouton flottant stylé pour ajouter une station
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.teal.shade500,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          'Nouvelle station',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StationFormScreen(jwtToken: widget.jwtToken),
-            ),
-          );
-          await stationProvider.loadStations(jwtToken: widget.jwtToken);
-        },
-      ),
-
-      body: RefreshIndicator(
-        onRefresh: () async =>
-            await stationProvider.loadStations(jwtToken: widget.jwtToken),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              // 🧭 Bannière d'accueil
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 18,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.teal.shade300, Colors.teal.shade500],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.teal.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Bienvenue sur la page des stations 🚗\nGérez vos stations actives facilement !',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 🔍 Barre de recherche
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Rechercher une station...',
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: Colors.teal.shade400,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 📋 Liste des stations
-              Expanded(
-                child: loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : filteredStations.isEmpty
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.location_off_rounded,
-                            color: Colors.grey,
-                            size: 60,
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            'Aucune station trouvée',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: filteredStations.length,
-                        itemBuilder: (context, index) {
-                          final s = filteredStations[index];
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                            margin: const EdgeInsets.symmetric(vertical: 8.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.95),
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 10,
-                              ),
-                              leading: CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.teal.shade200,
-                                child: const Icon(
-                                  Icons.ev_station_rounded,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
-                              ),
-                              title: Text(
-                                s.nom,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${s.adresse} - ${s.ville}',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: s.actif
-                                            ? Colors.green.shade500
-                                            : Colors.red.shade400,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        s.actif ? 'Active' : 'Inactive',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit_rounded,
-                                      color: Colors.teal,
-                                    ),
-                                    onPressed: () {
-                                      // même logique
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_rounded,
-                                      color: Colors.redAccent,
-                                    ),
-                                    onPressed: () async {
-                                      try {
-                                        await stationProvider.removeStation(
-                                          s.id,
-                                          jwtToken: widget.jwtToken,
-                                        );
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Station supprimée',
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(content: Text('Erreur: $e')),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+    return MainLayout(
+      title: 'Stations',
+      jwtToken: _token,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PageHeader(
+            title: 'Stations partenaires',
+            subtitle: provider.stations.isEmpty
+                ? 'Les stations où vos chauffeurs peuvent utiliser leurs tickets.'
+                : '${provider.stations.length} stations · $actives actives',
+            actions: [
+              FilledButton.icon(
+                onPressed: _create,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Nouvelle station'),
               ),
             ],
           ),
+          SearchField(hint: 'Nom, ville, adresse…', onChanged: (v) => setState(() => _search = v)),
+          const SizedBox(height: AppSpacing.lg),
+          if (provider.loading && provider.stations.isEmpty)
+            const LoadingView()
+          else if (_error != null)
+            Card(child: ErrorState(message: _error!, onRetry: _load))
+          else if (stations.isEmpty)
+            Card(
+              child: EmptyState(
+                icon: Icons.local_gas_station_outlined,
+                title: provider.stations.isEmpty ? 'Aucune station' : 'Aucun résultat',
+                message: provider.stations.isEmpty
+                    ? 'Ajoutez une station et son administrateur pour commencer.'
+                    : 'Modifiez votre recherche.',
+                action: provider.stations.isEmpty
+                    ? FilledButton(onPressed: _create, child: const Text('Nouvelle station'))
+                    : null,
+              ),
+            )
+          else
+            ResponsiveGrid(
+              minItemWidth: 300,
+              maxColumns: 3,
+              children: [for (final s in stations) _StationCard(station: s, onDelete: () => _delete(s))],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StationCard extends StatelessWidget {
+  const _StationCard({required this.station, required this.onDelete});
+  final Station station;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Tone.brand.softBg(context),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(Icons.local_gas_station_rounded, size: 20, color: Tone.brand.fg),
+                ),
+                const Spacer(),
+                StatusBadge(
+                  label: station.actif ? 'Active' : 'Inactive',
+                  tone: station.actif ? Tone.success : Tone.neutral,
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Actions',
+                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  onSelected: (v) => v == 'delete' ? onDelete() : null,
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Supprimer', style: TextStyle(color: Tone.danger.fg)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(station.nom, style: t.titleMedium),
+            const SizedBox(height: AppSpacing.xs),
+            Row(children: [
+              Icon(Icons.place_outlined, size: 16, color: t.bodySmall?.color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  [station.adresse, station.ville].where((e) => e.isNotEmpty).join(', '),
+                  style: t.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ]),
+          ],
         ),
       ),
     );

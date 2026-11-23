@@ -1,23 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../core/session.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
 import '../dtos/vehicule_request.dart';
 import '../models/carburant.dart';
 import '../providers/vehicule_provider.dart';
-
-// ✅ Définition de la couleur vert pétrole
-const vertPetrole = Color(0xFF006A6A);
+import 'main_layout.dart';
 
 class VehiculeFormScreen extends StatefulWidget {
+  const VehiculeFormScreen({super.key, this.id, this.vehiculeRequest, required this.jwtToken});
+
   final String? id;
   final VehiculeRequest? vehiculeRequest;
   final String jwtToken;
-
-  const VehiculeFormScreen({
-    super.key,
-    this.id,
-    this.vehiculeRequest,
-    required this.jwtToken,
-  });
 
   @override
   State<VehiculeFormScreen> createState() => _VehiculeFormScreenState();
@@ -25,205 +22,149 @@ class VehiculeFormScreen extends StatefulWidget {
 
 class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _immatriculationController = TextEditingController();
-  final _marqueController = TextEditingController();
-  final _modeleController = TextEditingController();
-  final _quotaController = TextEditingController();
+  final _immatriculation = TextEditingController();
+  final _marque = TextEditingController();
+  final _modele = TextEditingController();
+  final _quota = TextEditingController();
 
-  Carburant? selectedCarburant;
-  List<Carburant> carburants = [];
+  List<Carburant> _carburants = [];
+  int? _carburantId;
+  bool _loadingCarburants = true;
+  bool _saving = false;
+
+  bool get _isEdit => widget.id != null;
 
   @override
   void initState() {
     super.initState();
-    loadCarburants();
+    final r = widget.vehiculeRequest;
+    if (r != null) {
+      _immatriculation.text = r.immatriculation;
+      _marque.text = r.marque;
+      _modele.text = r.modele;
+      _quota.text = r.quotaCarburant.toStringAsFixed(r.quotaCarburant % 1 == 0 ? 0 : 1);
+      _carburantId = int.tryParse(r.carburantId);
+    }
+    _loadCarburants();
+  }
 
-    if (widget.vehiculeRequest != null) {
-      _immatriculationController.text = widget.vehiculeRequest!.immatriculation;
-      _marqueController.text = widget.vehiculeRequest!.marque;
-      _modeleController.text = widget.vehiculeRequest!.modele;
-      _quotaController.text = widget.vehiculeRequest!.quotaCarburant.toString();
+  @override
+  void dispose() {
+    for (final c in [_immatriculation, _marque, _modele, _quota]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
-      selectedCarburant = Carburant(
-        id: int.parse(widget.vehiculeRequest!.carburantId),
-        nom: "",
-        prix: 0,
-      );
+  Future<void> _loadCarburants() async {
+    try {
+      final list = await CarburantService().getAllCarburants(jwtToken: widget.jwtToken);
+      // Un même carburant peut exister dans plusieurs stations : on dédoublonne par nom.
+      final seen = <String>{};
+      final unique = list.where((c) => seen.add(c.nom.toLowerCase())).toList();
+      if (!mounted) return;
+      setState(() {
+        _carburants = unique;
+        if (_carburantId != null && !unique.any((c) => c.id == _carburantId)) {
+          final current = list.where((c) => c.id == _carburantId);
+          if (current.isNotEmpty) _carburants = [...unique, current.first];
+        }
+      });
+    } catch (_) {
+      if (mounted) showAppSnack(context, 'Liste des carburants indisponible.', tone: Tone.warning);
+    } finally {
+      if (mounted) setState(() => _loadingCarburants = false);
     }
   }
 
-  Future<void> loadCarburants() async {
-    final service = CarburantService();
-    final list = await service.getAllCarburants(jwtToken: widget.jwtToken);
-    setState(() {
-      carburants = list;
-      if (selectedCarburant != null) {
-        selectedCarburant = carburants.firstWhere(
-          (c) => c.id == selectedCarburant!.id,
-          orElse: () => carburants.first,
-        );
-      }
-    });
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final request = VehiculeRequest(
+      immatriculation: _immatriculation.text.trim().toUpperCase(),
+      marque: _marque.text.trim(),
+      modele: _modele.text.trim(),
+      quotaCarburant: double.tryParse(_quota.text.replaceAll(',', '.')) ?? 0,
+      carburantId: _carburantId.toString(),
+      userId: widget.vehiculeRequest?.userId.isNotEmpty == true ? widget.vehiculeRequest!.userId : Session.userId,
+    );
+    final provider = context.read<VehiculeProvider>();
+    if (_isEdit) {
+      await provider.editVehicule(widget.id!, request, jwtToken: widget.jwtToken);
+    } else {
+      await provider.addVehicule(request, jwtToken: widget.jwtToken);
+    }
+    if (!mounted) return;
+    setState(() => _saving = false);
+    showAppSnack(context, _isEdit ? 'Véhicule mis à jour.' : 'Véhicule ajouté.', tone: Tone.success);
+    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final vehiculeProvider = Provider.of<VehiculeProvider>(
-      context,
-      listen: false,
-    );
-
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: Text(
-          widget.id == null ? "Ajouter un véhicule" : "Modifier le véhicule",
-        ),
-        centerTitle: true,
-        backgroundColor: vertPetrole,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            constraints: const BoxConstraints(maxWidth: 500),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 12,
-                  spreadRadius: 3,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
+    final title = _isEdit ? 'Modifier le véhicule' : 'Nouveau véhicule';
+    return MainLayout(
+      title: title,
+      jwtToken: widget.jwtToken,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const BackLink(label: 'Véhicules'),
+          PageHeader(
+            title: title,
+            subtitle: 'Le quota définit le volume mensuel autorisé pour ce véhicule.',
+          ),
+          Form(
+            key: _formKey,
+            child: FormLayout(
+              footer: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+                  const SizedBox(width: AppSpacing.sm),
+                  PrimaryButton(label: _isEdit ? 'Enregistrer' : 'Ajouter le véhicule', onPressed: _submit, loading: _saving),
+                ],
+              ),
               children: [
-                const Text(
-                  "✨ Remplissez ce formulaire pour gérer vos véhicules facilement !",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
+                AppTextField(
+                  label: 'Immatriculation',
+                  controller: _immatriculation,
+                  required: true,
+                  hint: 'Ex. 11 JK 4521',
+                  icon: Icons.pin_outlined,
                 ),
-                const SizedBox(height: 24),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      _buildTextField(
-                        _immatriculationController,
-                        "Immatriculation",
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(_marqueController, "Marque"),
-                      const SizedBox(height: 12),
-                      _buildTextField(_modeleController, "Modèle"),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        _quotaController,
-                        "Quota Carburant",
-                        isNumber: true,
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<Carburant>(
-                        value: selectedCarburant,
-                        items: carburants
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c.nom),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedCarburant = value;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          labelText: "Carburant",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (v) =>
-                            v == null ? "Sélectionnez un carburant" : null,
-                      ),
-                      const SizedBox(height: 30),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            backgroundColor: vertPetrole,
-                          ),
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              final vehiculeRequest = VehiculeRequest(
-                                immatriculation:
-                                    _immatriculationController.text,
-                                marque: _marqueController.text,
-                                modele: _modeleController.text,
-                                quotaCarburant:
-                                    double.tryParse(_quotaController.text) ?? 0,
-                                carburantId: selectedCarburant!.id.toString(),
-                                userId: "1",
-                              );
-
-                              if (widget.id == null) {
-                                vehiculeProvider.addVehicule(
-                                  vehiculeRequest,
-                                  jwtToken: widget.jwtToken,
-                                );
-                              } else {
-                                vehiculeProvider.editVehicule(
-                                  widget.id!,
-                                  vehiculeRequest,
-                                  jwtToken: widget.jwtToken,
-                                );
-                              }
-
-                              Navigator.pop(context);
-                            }
-                          },
-                          child: Text(
-                            widget.id == null ? "Enregistrer" : "Mettre à jour",
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                    ],
+                FieldRow(children: [
+                  AppTextField(label: 'Marque', controller: _marque, required: true, hint: 'Ex. Toyota'),
+                  AppTextField(label: 'Modèle', controller: _modele, required: true, hint: 'Ex. Hilux'),
+                ]),
+                FieldRow(children: [
+                  AppDropdown<int>(
+                    label: 'Carburant',
+                    required: true,
+                    icon: Icons.local_gas_station_outlined,
+                    hint: _loadingCarburants ? 'Chargement…' : 'Choisir',
+                    value: _carburants.any((c) => c.id == _carburantId) ? _carburantId : null,
+                    items: [for (final c in _carburants) DropdownMenuItem(value: c.id, child: Text(c.nom))],
+                    onChanged: (v) => setState(() => _carburantId = v),
                   ),
-                ),
+                  AppTextField(
+                    label: 'Quota mensuel (litres)',
+                    controller: _quota,
+                    required: true,
+                    hint: 'Ex. 200',
+                    icon: Icons.water_drop_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) {
+                      final q = double.tryParse((v ?? '').replaceAll(',', '.'));
+                      return (q == null || q < 0) ? 'Quota invalide' : null;
+                    },
+                  ),
+                ]),
               ],
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    bool isNumber = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      validator: (v) => v!.isEmpty ? "Champ obligatoire" : null,
     );
   }
 }

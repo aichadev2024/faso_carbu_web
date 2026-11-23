@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ticket.dart';
 import '../services/api_service.dart';
+import '../core/config/app_config.dart';
 
 class TicketService {
-  final String baseUrl = "https://faso-carbu-backend-2.onrender.com/api";
+  final String baseUrl = AppConfig.apiUrl;
 
   Future<List<Ticket>> getTickets() async {
     final prefs = await SharedPreferences.getInstance();

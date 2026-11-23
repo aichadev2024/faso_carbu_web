@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/vehicule.dart';
 import '../dtos/vehicule_request.dart';
+import '../core/config/app_config.dart';
 
 class VehiculeService {
   static const String _baseUrl =
-      'https://faso-carbu-backend-2.onrender.com/api';
+      AppConfig.apiUrl;
 
   Future<List<Vehicule>> getAllVehicules({required String jwtToken}) async {
     final res = await http.get(

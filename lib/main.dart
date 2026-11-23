@@ -1,32 +1,43 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:gestionnaire_dashboard/screens/vehicule_form_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+
+import 'core/config/app_config.dart';
+import 'core/session.dart';
+import 'core/theme/app_theme.dart';
+import 'firebase_options.dart';
+import 'providers/carburant_provider.dart';
+import 'providers/demande_provider.dart';
+import 'providers/station_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/vehicule_provider.dart';
+import 'screens/ProfilScreen.dart';
+import 'screens/change_password_screen.dart';
+import 'screens/consommation_screen.dart';
+import 'screens/dashboard_gestionnaire_screen.dart';
+import 'screens/demande_form_screen.dart';
+import 'screens/demande_list_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/rapport_screen.dart';
+import 'screens/register_gestionnaire_screen.dart';
+import 'screens/splash_screen.dart';
+import 'screens/station_list_screen.dart';
+import 'screens/tickets_screen.dart';
 import 'screens/user_form_screen.dart';
 import 'screens/users_list_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/dashboard_gestionnaire_screen.dart';
-import 'package:gestionnaire_dashboard/screens/register_gestionnaire_screen.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'screens/station_list_screen.dart';
-import 'screens/demande_list_screen.dart';
-import 'providers/station_provider.dart';
-import 'providers/demande_provider.dart';
-import 'screens/demande_form_screen.dart';
+import 'screens/vehicule_form_screen.dart';
 import 'screens/vehicule_list_screen.dart';
-import 'providers/vehicule_provider.dart';
-import 'screens/tickets_screen.dart';
-import 'providers/user_provider.dart';
-import 'providers/carburant_provider.dart';
-import 'screens/rapport_screen.dart';
 import 'services/rapport_service.dart';
-import 'screens/ProfilScreen.dart';
-import 'screens/onboarding_screen.dart';
-import 'screens/splash_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+  } catch (e) {
+    debugPrint('Firebase indisponible : $e');
+  }
+  await Session.load();
 
   runApp(
     MultiProvider(
@@ -37,161 +48,100 @@ void main() async {
         ChangeNotifierProvider(create: (_) => VehiculeProvider()),
         ChangeNotifierProvider(create: (_) => CarburantProvider()),
       ],
-      child: const GestionnaireDashboardApp(),
+      child: const FasoCarbuApp(),
     ),
   );
 }
 
-class GestionnaireDashboardApp extends StatelessWidget {
-  const GestionnaireDashboardApp({super.key});
+/// Routes accessibles sans être connecté.
+const _publicRoutes = {'/', '/login', '/register-gestionnaire'};
+
+class FasoCarbuApp extends StatelessWidget {
+  const FasoCarbuApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gestionnaire Dashboard',
+      title: 'FasoCarbu · Gestionnaire',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Roboto',
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[100],
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.blueAccent,
-          ),
-          bodyMedium: TextStyle(fontSize: 16, color: Colors.black87),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 14,
-            horizontal: 16,
-          ),
-          border: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Colors.blueAccent),
-          ),
-          enabledBorder: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Colors.blueAccent),
-          ),
-          focusedBorder: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Colors.blue, width: 2),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueAccent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.light,
+      locale: const Locale('fr', 'FR'),
+      supportedLocales: const [Locale('fr', 'FR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      // L'URL du navigateur (#/demandes...) ouvre directement la bonne page,
+      // y compris après un rafraîchissement.
+      onGenerateInitialRoutes: (name) => [_onGenerateRoute(RouteSettings(name: name))],
+      onGenerateRoute: _onGenerateRoute,
+    );
+  }
 
-      onGenerateRoute: (settings) {
-        final args = settings.arguments as Map<String, dynamic>?;
+  static Route<dynamic> _onGenerateRoute(RouteSettings settings) {
+    var name = settings.name ?? '/';
 
-        switch (settings.name) {
-          case '/':
-            return MaterialPageRoute(builder: (_) => const SplashScreen());
+    // Pages protégées : retour à la connexion si pas de session.
+    if (!_publicRoutes.contains(name) && !Session.isLoggedIn) {
+      name = '/login';
+    }
 
-          case '/onboarding':
-            return MaterialPageRoute(builder: (_) => const OnboardingScreen());
+    // Le token vient des arguments si fournis, sinon de la session
+    // (indispensable après un rafraîchissement de la page web).
+    final passed = settings.arguments is Map<String, dynamic>
+        ? settings.arguments as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final args = {...Session.routeArgs, ...passed};
+    final token = (args['jwtToken'] as String?)?.isNotEmpty == true ? args['jwtToken'] as String : Session.token;
+    final routeSettings = RouteSettings(name: name, arguments: args);
 
-          case '/login':
-            return MaterialPageRoute(builder: (_) => const LoginScreen());
+    Widget page;
+    switch (name) {
+      case '/':
+        page = const SplashScreen();
+      case '/login':
+        page = const LoginScreen();
+      case '/register-gestionnaire':
+        page = const RegisterGestionnaireScreen();
+      case '/dashboard':
+        page = const DashboardGestionnaireScreen();
+      case '/users':
+        page = UsersListScreen();
+      case '/users/form':
+        page = const UserFormScreen();
+      case '/stations':
+        page = StationListScreen(jwtToken: token);
+      case '/demandes':
+        page = DemandeListScreen();
+      case '/demandes/form':
+        page = const DemandeFormScreen();
+      case '/vehicules':
+        page = VehiculeListScreen(jwtToken: token);
+      case '/vehicule/form':
+        page = VehiculeFormScreen(jwtToken: token);
+      case '/tickets':
+        page = const TicketsScreen();
+      case '/consommations':
+        page = ConsommationScreen();
+      case '/rapports':
+        page = RapportScreen(service: RapportService(baseUrl: AppConfig.backendUrl, token: token));
+      case '/profil':
+        page = ProfilScreen(jwtToken: token, userId: (args['userId'] as String?) ?? Session.userId);
+      case '/change-password':
+        page = ChangePasswordScreen(token: token);
+      default:
+        page = Session.isLoggedIn ? const DashboardGestionnaireScreen() : const LoginScreen();
+    }
 
-          case '/register-gestionnaire':
-            return MaterialPageRoute(
-              builder: (_) => const RegisterGestionnaireScreen(),
-            );
-
-          case '/dashboard':
-            return MaterialPageRoute(
-              builder: (_) => const DashboardGestionnaireScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/users':
-            return MaterialPageRoute(
-              builder: (_) => UsersListScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/users/form':
-            return MaterialPageRoute(
-              builder: (_) => UserFormScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/stations':
-            return MaterialPageRoute(
-              builder: (_) =>
-                  StationListScreen(jwtToken: args?['jwtToken'] ?? ''),
-            );
-
-          case '/demandes':
-            return MaterialPageRoute(
-              builder: (_) => DemandeListScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/demandes/form':
-            return MaterialPageRoute(
-              builder: (_) => DemandeFormScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/vehicules':
-            return MaterialPageRoute(
-              builder: (_) =>
-                  VehiculeListScreen(jwtToken: args?['jwtToken'] ?? ''),
-            );
-
-          case '/vehicule/form':
-            return MaterialPageRoute(
-              builder: (_) =>
-                  VehiculeFormScreen(jwtToken: args?['jwtToken'] ?? ''),
-            );
-          case '/rapports':
-            return MaterialPageRoute(
-              builder: (_) => RapportScreen(
-                service: RapportService(
-                  baseUrl: "https://faso-carbu-backend-2.onrender.com",
-                  token: args?['jwtToken'] ?? '',
-                ),
-              ),
-              settings: RouteSettings(arguments: args),
-            );
-          case '/profil':
-            return MaterialPageRoute(
-              builder: (_) => ProfilScreen(
-                jwtToken: args?['jwtToken'] ?? '',
-                userId: args?['userId'],
-              ),
-              settings: RouteSettings(arguments: args),
-            );
-
-          case '/tickets':
-            return MaterialPageRoute(
-              builder: (_) => const TicketsScreen(),
-              settings: RouteSettings(arguments: args),
-            );
-
-          default:
-            return MaterialPageRoute(builder: (_) => const LoginScreen());
-        }
-      },
+    // Transitions sobres : simple fondu entre les pages.
+    return PageRouteBuilder(
+      settings: routeSettings,
+      pageBuilder: (_, __, ___) => page,
+      transitionDuration: const Duration(milliseconds: 160),
+      transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
     );
   }
 }

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../core/config/app_config.dart';
 
 class UserService {
-  final String baseUrl = "https://faso-carbu-backend-2.onrender.com/api";
+  final String baseUrl = AppConfig.apiUrl;
 
   // 🔹 Récupère tous les utilisateurs (optionnel)
   Future<List<User>> getAllUsers({String search = '', String? jwtToken}) async {

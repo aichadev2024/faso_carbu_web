@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/demande.dart';
+import '../core/config/app_config.dart';
 
 class DemandeService {
-  final String baseUrl = "https://faso-carbu-backend-2.onrender.com";
+  final String baseUrl = AppConfig.backendUrl;
 
   // ===================== Récupérer toutes les demandes =====================
   Future<List<Demande>> getAllDemandes({required String jwtToken}) async {

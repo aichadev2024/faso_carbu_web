@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/app_config.dart';
 
 class Carburant {
   final int id;
@@ -26,7 +27,7 @@ class Carburant {
 
 class CarburantService {
   static const String _baseUrl =
-      "https://faso-carbu-backend-2.onrender.com/api";
+      AppConfig.apiUrl;
 
   // 🔹 Ajout du jwtToken en paramètre
   Future<List<Carburant>> getAllCarburants({required String jwtToken}) async {

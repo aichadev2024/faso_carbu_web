@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'; // pour kIsWeb
 import '../firebase_options.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../core/config/app_config.dart';
 
 class PushNotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -69,7 +70,7 @@ class PushNotificationService {
   }) async {
     try {
       const backendUrl =
-          "https://faso-carbu-backend-2.onrender.com/api/utilisateurs/update-token";
+          "${AppConfig.apiUrl}/utilisateurs/update-token";
       final response = await http.post(
         Uri.parse(backendUrl),
         headers: {

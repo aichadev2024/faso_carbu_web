@@ -2,311 +2,263 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/session.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
 import '../models/ticket.dart';
 import '../models/user.dart';
-import '../services/ticket_service.dart';
 import '../providers/user_provider.dart';
-
-// ✅ Couleur vert pétrole
-const vertPetrole = Color(0xFF006A6A);
+import '../services/ticket_service.dart';
+import 'main_layout.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
 
   @override
-  _TicketsScreenState createState() => _TicketsScreenState();
+  State<TicketsScreen> createState() => _TicketsScreenState();
 }
 
 class _TicketsScreenState extends State<TicketsScreen> {
-  final TicketService ticketService = TicketService();
-  late Future<List<Ticket>> _ticketsFuture;
+  final _service = TicketService();
+  List<Ticket> _tickets = [];
+  bool _loading = true;
+  String? _error;
+  String _filter = 'TOUS';
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
-    _ticketsFuture = _loadTickets();
+    _load();
   }
 
-  Future<List<Ticket>> _loadTickets() async {
-    return ticketService.getTickets();
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await _service.getTickets();
+      list.sort((a, b) => (b.dateEmission ?? DateTime(0)).compareTo(a.dateEmission ?? DateTime(0)));
+      if (mounted) setState(() => _tickets = list);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Impossible de charger les tickets.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  Future<void> _attribuerTicket(BuildContext context, Ticket t) async {
-    if (t.entrepriseId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Impossible de récupérer l'entreprise depuis le ticket",
-          ),
-        ),
-      );
+  String _beneficiaire(Ticket t) => '${t.utilisateurPrenom ?? ''} ${t.utilisateurNom ?? ''}'.trim();
+
+  List<Ticket> get _visible {
+    final q = _search.toLowerCase();
+    return _tickets.where((t) {
+      if (_filter != 'TOUS' && statusInfo(t.statut).label != statusInfo(_filter).label) return false;
+      if (q.isEmpty) return true;
+      return [_beneficiaire(t), t.stationNom ?? '', t.vehiculeImmatriculation ?? '', t.carburantNom ?? '', '#${t.id}']
+          .any((s) => s.toLowerCase().contains(q));
+    }).toList();
+  }
+
+  Future<void> _attribuer(Ticket t) async {
+    if (t.entrepriseId == null || t.id == null) {
+      showAppSnack(context, 'Entreprise du ticket introuvable.', tone: Tone.danger);
       return;
     }
-
+    List<User> chauffeurs;
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-
-      final chauffeurs = await userProvider.loadChauffeursByEntreprise(
-        t.entrepriseId.toString(),
-      );
-
-      if (chauffeurs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Aucun chauffeur disponible")),
-        );
-        return;
-      }
-
-      final chauffeur = await showDialog<User>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Attribuer à un chauffeur"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView(
-              shrinkWrap: true,
-              children: chauffeurs
-                  .map(
-                    (c) => ListTile(
-                      title: Text("${c.nom} ${c.prenom}"),
-                      onTap: () => Navigator.pop(ctx, c),
-                    ),
-                  )
-                  .toList(),
-            ),
+      chauffeurs = await context.read<UserProvider>().loadChauffeursByEntreprise(t.entrepriseId.toString());
+    } catch (_) {
+      if (mounted) showAppSnack(context, 'Liste des chauffeurs indisponible.', tone: Tone.danger);
+      return;
+    }
+    if (!mounted) return;
+    if (chauffeurs.isEmpty) {
+      showAppSnack(context, 'Aucun chauffeur disponible dans l\'entreprise.', tone: Tone.warning);
+      return;
+    }
+    final chauffeur = await showDialog<User>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Attribuer le ticket #${t.id}'),
+        content: SizedBox(
+          width: 400,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final c in chauffeurs)
+                ListTile(
+                  leading: InitialsAvatar(name: '${c.prenom} ${c.nom}', size: 32),
+                  title: Text('${c.prenom} ${c.nom}'),
+                  subtitle: Text(c.telephone.isEmpty ? c.email : c.telephone),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                  onTap: () => Navigator.pop(ctx, c),
+                ),
+            ],
           ),
         ),
-      );
-
-      if (chauffeur != null) {
-        await ticketService.attribuerTicket(t.id!, chauffeur.id!);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ Ticket attribué avec succès")),
-        );
-
-        setState(() {
-          _ticketsFuture = _loadTickets();
-        });
-      }
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler'))],
+      ),
+    );
+    if (chauffeur == null) return;
+    try {
+      await _service.attribuerTicket(t.id!, chauffeur.id!);
+      if (!mounted) return;
+      showAppSnack(context, 'Ticket attribué à ${chauffeur.prenom} ${chauffeur.nom}.', tone: Tone.success);
+      _load();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Erreur attribution : $e")));
+      if (mounted) showAppSnack(context, 'Attribution impossible.', tone: Tone.danger);
     }
+  }
+
+  void _showQr(Ticket t) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Ticket #${t.id}'),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: Theme.of(ctx).dividerColor),
+                ),
+                child: QrImageView(data: t.codeQr!, size: 220),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _kv(ctx, 'Bénéficiaire', _beneficiaire(t)),
+              _kv(ctx, 'Carburant', '${formatNumber(t.quantite)} L · ${t.carburantNom ?? '—'}'),
+              _kv(ctx, 'Station', t.stationNom ?? '—'),
+              _kv(ctx, 'Montant', '${formatNumber(t.somme ?? t.montant)} FCFA'),
+            ],
+          ),
+        ),
+        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer'))],
+      ),
+    );
+  }
+
+  Widget _kv(BuildContext context, String k, String v) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Expanded(child: Text(k, style: t.bodyMedium)),
+        Text(v.isEmpty ? '—' : v, style: t.titleSmall),
+      ]),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: vertPetrole.withValues(
-        alpha: 0.05,
-      ), // 🌿 Fond léger vert pétrole
-      appBar: AppBar(
-        title: const Text("🎟️ Tickets Carburant"),
-        centerTitle: true,
-        backgroundColor: vertPetrole,
-        elevation: 0,
-      ),
-      body: FutureBuilder<List<Ticket>>(
-        future: _ticketsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: vertPetrole),
-            );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Oops! Une erreur est survenue : ${snapshot.error}",
-                style: const TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
+    final total = _tickets.fold<double>(0, (s, t) => s + (t.somme ?? t.montant ?? 0));
+    final litres = _tickets.fold<double>(0, (s, t) => s + (t.quantite ?? 0));
+    int count(String s) => _tickets.where((t) => statusInfo(t.statut).label == statusInfo(s).label).length;
+    final visible = _visible;
+    final isGestionnaire = Session.role.toUpperCase().contains('GESTIONNAIRE');
+
+    return MainLayout(
+      title: 'Tickets',
+      jwtToken: Session.token,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PageHeader(
+            title: 'Tickets carburant',
+            subtitle: 'Tickets émis après validation des demandes, avec leur QR code.',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: _loading ? null : _load,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Actualiser'),
               ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.airplane_ticket, size: 80, color: vertPetrole),
-                  SizedBox(height: 16),
-                  Text(
-                    "Aucun ticket disponible pour le moment 😔",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "Créez-en un nouveau pour attribuer à vos chauffeurs!",
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final tickets = snapshot.data!;
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: tickets.length,
-            itemBuilder: (context, index) {
-              final t = tickets[index];
-
-              return Container(
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+            ],
+          ),
+          if (!_loading && _error == null) ...[
+            ResponsiveGrid(minItemWidth: 220, children: [
+              StatCard(label: 'Tickets émis', value: '${_tickets.length}', icon: Icons.confirmation_number_rounded),
+              StatCard(label: 'En attente', value: '${count('EN_ATTENTE')}', icon: Icons.schedule_rounded, tone: Tone.warning),
+              StatCard(label: 'Volume', value: '${formatNumber(litres)} L', icon: Icons.water_drop_rounded, tone: Tone.info),
+              StatCard(label: 'Montant total', value: formatNumber(total), hint: 'FCFA', icon: Icons.payments_rounded, tone: Tone.success),
+            ]),
+            const SizedBox(height: AppSpacing.xl),
+          ],
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final f in [('TOUS', 'Tous'), ('EN_ATTENTE', 'En attente'), ('VALIDER', 'Validés'), ('CONSOMMEE', 'Consommés'), ('REJETER', 'Rejetés')])
+                ChoiceChip(
+                  label: Text(f.$2),
+                  selected: _filter == f.$1,
+                  showCheckmark: false,
+                  onSelected: (_) => setState(() => _filter = f.$1),
                 ),
-                child: Column(
-                  children: [
-                    // 🌈 Bandeau entreprise + statut
-                    Container(
-                      decoration: BoxDecoration(
-                        color: vertPetrole,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "🏢 ${t.entrepriseNom ?? 'Entreprise'}",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+              const SizedBox(width: AppSpacing.sm),
+              SearchField(hint: 'Bénéficiaire, station…', onChanged: (v) => setState(() => _search = v)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: _loading
+                ? const LoadingView()
+                : _error != null
+                    ? ErrorState(message: _error!, onRetry: _load)
+                    : visible.isEmpty
+                        ? EmptyState(
+                            icon: Icons.confirmation_number_outlined,
+                            title: _tickets.isEmpty ? 'Aucun ticket' : 'Aucun résultat',
+                            message: _tickets.isEmpty
+                                ? 'Les tickets apparaissent ici dès qu\'une demande est validée.'
+                                : 'Modifiez les filtres ou la recherche.',
+                          )
+                        : AppDataTable(
+                            columns: const [
+                              DataColumn(label: Text('N°')),
+                              DataColumn(label: Text('ÉMIS LE')),
+                              DataColumn(label: Text('BÉNÉFICIAIRE')),
+                              DataColumn(label: Text('CARBURANT')),
+                              DataColumn(label: Text('MONTANT'), numeric: true),
+                              DataColumn(label: Text('STATION')),
+                              DataColumn(label: Text('STATUT')),
+                              DataColumn(label: Text('')),
+                            ],
+                            rows: [
+                              for (final t in visible)
+                                DataRow(cells: [
+                                  DataCell(Text('#${t.id ?? '—'}', style: Theme.of(context).textTheme.bodySmall)),
+                                  DataCell(Text(formatDate(t.dateEmission, withTime: true))),
+                                  DataCell(Text(_beneficiaire(t).isEmpty ? '—' : _beneficiaire(t))),
+                                  DataCell(Text('${formatNumber(t.quantite)} L · ${t.carburantNom ?? '—'}')),
+                                  DataCell(Text('${formatNumber(t.somme ?? t.montant)} FCFA')),
+                                  DataCell(Text(t.stationNom ?? '—')),
+                                  DataCell(StatusBadge.fromStatus(t.statut)),
+                                  DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+                                    if (t.codeQr != null && t.codeQr!.isNotEmpty)
+                                      IconButton(
+                                        tooltip: 'Voir le QR code',
+                                        icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+                                        onPressed: () => _showQr(t),
+                                      ),
+                                    if (isGestionnaire)
+                                      IconButton(
+                                        tooltip: 'Attribuer à un chauffeur',
+                                        icon: const Icon(Icons.person_add_alt_outlined, size: 20),
+                                        onPressed: () => _attribuer(t),
+                                      ),
+                                  ])),
+                                ]),
+                            ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: (t.statut == "VALIDE")
-                                  ? Colors.green
-                                  : Colors.orange,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              t.statut ?? "-",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // 📝 Infos principales
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "${t.carburantNom ?? 'Carburant'} • ${t.quantite ?? 0} L",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: vertPetrole,
-                            ),
-                          ),
-                          const Divider(),
-                          Text(
-                            "💰 Somme : ${t.somme?.toStringAsFixed(0) ?? '0'} FCFA",
-                          ),
-                          Text(
-                            "👨 Chauffeur : ${t.utilisateurNom ?? '-'} ${t.utilisateurPrenom ?? ''}",
-                          ),
-                          Text(
-                            "🛠 Validateur : ${t.validateurNom ?? '-'} ${t.validateurPrenom ?? ''}",
-                          ),
-                          Text(
-                            "🚘 Véhicule : ${t.vehiculeImmatriculation ?? '-'}",
-                          ),
-                          Text("⛽ Station : ${t.stationNom ?? '-'}"),
-                          Text(
-                            "📅 Émis le : ${Ticket.formatDate(t.dateEmission)}",
-                          ),
-                          Text(
-                            "✅ Validé le : ${Ticket.formatDate(t.dateValidation)}",
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // 🔳 QR Code + Action
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: vertPetrole.withValues(alpha: 0.05),
-                        borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          (t.codeQr != null)
-                              ? QrImageView(data: t.codeQr!, size: 90)
-                              : const Icon(
-                                  Icons.qr_code,
-                                  color: vertPetrole,
-                                  size: 40,
-                                ),
-                          if (t.utilisateurNom == null)
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: vertPetrole,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
-                                ),
-                              ),
-                              icon: const Icon(
-                                Icons.person_add,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                "Attribuer",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              onPressed: () => _attribuerTicket(context, t),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+          ),
+        ],
       ),
     );
   }
