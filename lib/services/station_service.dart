@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/station.dart';
 import '../dtos/station_avec_admin_request.dart';
+import '../core/config/app_config.dart';
 
 class StationService {
   static const String _baseUrl =
-      'https://faso-carbu-backend-2.onrender.com/api/gestionnaires';
+      '${AppConfig.apiUrl}/gestionnaires';
 
   Future<List<Station>> getAllStations({required String jwtToken}) async {
     final uri = Uri.parse('$_baseUrl/stations');

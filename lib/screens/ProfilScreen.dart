@@ -1,314 +1,199 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'change_password_screen.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../core/config/app_config.dart';
+import '../core/session.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
+import 'main_layout.dart';
 
 class ProfilScreen extends StatefulWidget {
+  const ProfilScreen({super.key, required this.jwtToken, required this.userId});
   final String jwtToken;
   final String userId;
-
-  const ProfilScreen({super.key, required this.jwtToken, required this.userId});
 
   @override
   State<ProfilScreen> createState() => _ProfilScreenState();
 }
 
 class _ProfilScreenState extends State<ProfilScreen> {
-  Map<String, dynamic>? userData;
-  bool isLoading = true;
-  final Color vertPetrole = const Color(0xFF006666);
+  Map<String, dynamic>? _user;
+  bool _loading = true;
+  bool _uploading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadCachedUser();
+    _load();
   }
 
-  Future<void> _loadCachedUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('userData_${widget.userId}');
-    if (cached != null) {
-      setState(() {
-        userData = jsonDecode(cached);
-        isLoading = false;
-      });
-    }
-    await fetchUserProfil();
-  }
-
-  /// Récupère le profil depuis l’API
-  Future<void> fetchUserProfil() async {
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final response = await http.get(
-        Uri.parse(
-          "https://faso-carbu-backend-2.onrender.com/api/utilisateurs/${widget.userId}",
-        ),
-        headers: {
-          "Authorization": "Bearer ${widget.jwtToken}",
-          "Content-Type": "application/json",
-        },
+      final res = await http.get(
+        Uri.parse('${AppConfig.apiUrl}/utilisateurs/${widget.userId}'),
+        headers: {'Authorization': 'Bearer ${widget.jwtToken}'},
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          userData = data;
-        });
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userData_${widget.userId}', jsonEncode(data));
-      } else {
-        throw Exception("Erreur récupération profil: ${response.body}");
-      }
-    } catch (e) {
-      debugPrint("❌ Erreur profil: $e");
+      if (res.statusCode != 200) throw Exception(res.statusCode);
+      if (mounted) setState(() => _user = jsonDecode(utf8.decode(res.bodyBytes)));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Impossible de charger votre profil.');
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  /// Met à jour la photo de profil (compatible Web)
-  Future<void> _changeProfilePhoto() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-
+  Future<void> _changePhoto() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800);
+    if (picked == null) return;
+    setState(() => _uploading = true);
     try {
-      final bytes = await pickedFile.readAsBytes();
-
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse(
-          'https://faso-carbu-backend-2.onrender.com/api/utilisateurs/${widget.userId}/upload-photo',
-        ),
-      );
-
-      final multipartFile = http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: pickedFile.name,
-      );
-
-      request.files.add(multipartFile);
-      request.headers['Authorization'] = 'Bearer ${widget.jwtToken}';
-
-      final response = await request.send();
-
-      if (response.statusCode == 200) {
-        final respStr = await response.stream.bytesToString();
-        final data = jsonDecode(respStr);
-        String newPhotoUrl = data['photoProfil'];
-
-        // Force reload sur le Web en ajoutant un query param unique
-        newPhotoUrl += '?t=${DateTime.now().millisecondsSinceEpoch}';
-
-        if (mounted) {
-          setState(() {
-            userData!['photoUrl'] = newPhotoUrl;
+        Uri.parse('${AppConfig.apiUrl}/utilisateurs/${widget.userId}/upload-photo'),
+      )
+        ..headers['Authorization'] = 'Bearer ${widget.jwtToken}'
+        ..files.add(http.MultipartFile.fromBytes('file', await picked.readAsBytes(), filename: picked.name));
+      final res = await request.send();
+      if (res.statusCode != 200) throw Exception(res.statusCode);
+      final data = jsonDecode(await res.stream.bytesToString());
+      if (!mounted) return;
+      setState(() => _user = {
+            ...?_user,
+            'photoProfil': '${data['photoProfil']}?t=${DateTime.now().millisecondsSinceEpoch}',
           });
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-          'userData_${widget.userId}',
-          jsonEncode(userData),
-        );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Photo de profil mise à jour !')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Échec de la mise à jour de la photo'),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint("Erreur upload photo: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ Erreur: $e")));
+      showAppSnack(context, 'Photo de profil mise à jour.', tone: Tone.success);
+    } catch (_) {
+      if (mounted) showAppSnack(context, 'Envoi de la photo impossible.', tone: Tone.danger);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
-  String _formatRole(String role) {
-    switch (role) {
-      case 'ROLE_CHAUFFEUR':
-        return 'Chauffeur';
-      case 'ROLE_GESTIONNAIRE':
-        return 'Gestionnaire';
-      case 'ROLE_AGENT_STATION':
-        return 'Agent de station';
-      default:
-        return role;
-    }
+  String? get _photoUrl {
+    final p = (_user?['photoProfil'] ?? _user?['photoUrl'])?.toString();
+    if (p == null || p.isEmpty) return null;
+    return p.startsWith('http') ? p : '${AppConfig.backendUrl}$p';
   }
 
   @override
   Widget build(BuildContext context) {
-    const vertPetroleGradient = LinearGradient(
-      colors: [Color(0xFF009999), Color(0xFF006666)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
+    final t = Theme.of(context).textTheme;
+    final u = _user ?? {};
+    final fullName = '${u['prenom'] ?? Session.prenom} ${u['nom'] ?? Session.nom}'.trim();
+    final entreprise = u['entreprise'] is Map ? u['entreprise'] as Map : null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: vertPetrole))
-          : Container(
-              decoration: const BoxDecoration(gradient: vertPetroleGradient),
-              child: Center(
-                child: Container(
-                  width: 450,
-                  margin: const EdgeInsets.all(24),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 32,
-                    horizontal: 24,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 15,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Photo avec bouton caméra
-                      Stack(
-                        alignment: Alignment.bottomRight,
+    Widget info(IconData icon, String label, String? value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Row(children: [
+            Icon(icon, size: 20, color: t.bodySmall?.color),
+            const SizedBox(width: AppSpacing.md),
+            SizedBox(width: 140, child: Text(label, style: t.bodyMedium)),
+            Expanded(child: Text((value ?? '').isEmpty ? '—' : value!, style: t.titleSmall)),
+          ]),
+        );
+
+    return MainLayout(
+      title: 'Mon profil',
+      jwtToken: widget.jwtToken,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const PageHeader(title: 'Mon profil', subtitle: 'Vos informations personnelles et la sécurité de votre compte.'),
+          if (_loading)
+            const LoadingView()
+          else if (_error != null)
+            Card(child: ErrorState(message: _error!, onRetry: _load))
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Wrap(
+                        spacing: AppSpacing.xl,
+                        runSpacing: AppSpacing.lg,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 55,
-                            backgroundImage:
-                                (userData?['photoUrl'] != null &&
-                                    userData!['photoUrl'].toString().isNotEmpty)
-                                ? NetworkImage(userData!['photoUrl'])
-                                : const AssetImage(
-                                        'assets/images/avatar_placeholder.png',
-                                      )
-                                      as ImageProvider,
-                            onBackgroundImageError: (_, __) {
-                              SchedulerBinding.instance.addPostFrameCallback((
-                                _,
-                              ) {
-                                if (mounted) {
-                                  setState(() {
-                                    userData!['photoUrl'] = null;
-                                  });
-                                }
-                              });
-                            },
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 4,
-                            child: InkWell(
-                              onTap: _changeProfilePhoto,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: vertPetrole,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.white,
-                                  size: 20,
+                          Stack(children: [
+                            InitialsAvatar(name: fullName, size: 88, imageUrl: _photoUrl),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Material(
+                                color: Theme.of(context).colorScheme.primary,
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: _uploading ? null : _changePhoto,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(7),
+                                    child: _uploading
+                                        ? const SizedBox(
+                                            width: 16, height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                        : const Icon(Icons.photo_camera_outlined, size: 16, color: Colors.white),
+                                  ),
                                 ),
                               ),
                             ),
+                          ]),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(fullName, style: t.headlineSmall),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text('${u['email'] ?? Session.email}', style: t.bodyMedium),
+                              const SizedBox(height: AppSpacing.sm),
+                              StatusBadge(label: Session.roleLabelOf('${u['role'] ?? Session.role}'), tone: Tone.brand),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        "${userData?['nom'] ?? ''} ${userData?['prenom'] ?? ''}",
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        _formatRole(userData?['role'] ?? ''),
-                        style: TextStyle(
-                          color: vertPetrole,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        height: 1,
-                        color: Colors.grey[300],
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      _infoText(Icons.email, userData?['email'] ?? ''),
-                      if (userData?['telephone'] != null)
-                        _infoText(Icons.phone, userData!['telephone']),
-                      if (userData?['adresse'] != null)
-                        _infoText(Icons.location_on, userData!['adresse']),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ChangePasswordScreen(token: widget.jwtToken),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: vertPetrole,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 14,
-                          ),
-                        ),
-                        icon: const Icon(Icons.lock, color: Colors.white),
-                        label: const Text(
-                          "Changer le mot de passe",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.lg),
+                  AppCard(
+                    title: 'Informations',
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.sm),
+                    child: Column(children: [
+                      info(Icons.person_outline_rounded, 'Nom complet', fullName),
+                      info(Icons.alternate_email_rounded, 'Identifiant', u['nomUtilisateur']?.toString()),
+                      info(Icons.mail_outline_rounded, 'Email', u['email']?.toString()),
+                      info(Icons.phone_outlined, 'Téléphone', u['telephone']?.toString()),
+                      info(Icons.business_outlined, 'Entreprise', entreprise?['nom']?.toString()),
+                      info(Icons.event_outlined, 'Membre depuis',
+                          formatDate(DateTime.tryParse('${u['dateCreation'] ?? ''}'))),
+                    ]),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  AppCard(
+                    title: 'Sécurité',
+                    subtitle: 'Changez régulièrement votre mot de passe.',
+                    trailing: OutlinedButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/change-password', arguments: Session.routeArgs),
+                      icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                      label: const Text('Changer le mot de passe'),
+                    ),
+                    padding: EdgeInsets.zero,
+                    child: const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
+        ],
+      ),
     );
   }
-
-  Widget _infoText(IconData icon, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: vertPetrole),
-        const SizedBox(width: 8),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 15, color: Colors.black87),
-        ),
-      ],
-    ),
-  );
 }

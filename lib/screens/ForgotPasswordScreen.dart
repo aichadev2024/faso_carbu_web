@@ -1,9 +1,13 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'ResetPasswordScreen.dart';
 
-const String baseUrl = 'https://faso-carbu-backend-2.onrender.com/api';
+import '../core/config/app_config.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/app_widgets.dart';
+import '../core/widgets/auth_scaffold.dart';
+import 'ResetPasswordScreen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -13,164 +17,77 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _emailController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
   bool _loading = false;
-  String? _message;
+  String? _error;
 
-  Future<void> _resetPassword() async {
-    final email = _emailController.text.trim();
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
 
-    if (email.isEmpty) {
-      setState(() => _message = "Veuillez entrer votre email");
-      return;
-    }
-
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final email = _email.text.trim();
     setState(() {
       _loading = true;
-      _message = null;
+      _error = null;
     });
-
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/forgot-password'),
+      final res = await http.post(
+        Uri.parse('${AppConfig.apiUrl}/auth/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ResetPasswordScreen(email: email),
-          ),
-        );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        if (!mounted) return;
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ResetPasswordScreen(email: email)));
       } else {
-        final body = jsonDecode(response.body);
-        setState(() {
-          _message = body['message'] ?? "Erreur lors de la demande";
-        });
+        String msg = 'Aucun compte ne correspond à cet email.';
+        try {
+          msg = jsonDecode(res.body)['message'] ?? msg;
+        } catch (_) {}
+        setState(() => _error = msg);
       }
-    } catch (e) {
-      setState(() {
-        _message = "⚠️ Impossible de contacter le serveur";
-      });
+    } catch (_) {
+      setState(() => _error = 'Serveur injoignable. Réessayez plus tard.');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.of(context).size.width < 800;
-
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF003B46), Color(0xFF07575B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+    return AuthScaffold(
+      title: 'Mot de passe oublié',
+      subtitle: 'Saisissez votre email : nous vous enverrons un code de réinitialisation.',
+      footer: Center(
+        child: TextButton.icon(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+          label: const Text('Retour à la connexion'),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Container(
-              width: isSmall ? double.infinity : 600,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 15,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(30),
-              child: Column(
-                children: [
-                  Image.asset('assets/images/Image.web.png', height: 90),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "Mot de passe oublié",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF003B46),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    "Entrez votre adresse email pour recevoir un code de réinitialisation.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: "Email",
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (_message != null)
-                    Text(
-                      _message!,
-                      style: TextStyle(
-                        color: _message!.startsWith("✅")
-                            ? Colors.green
-                            : Colors.redAccent,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _resetPassword,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF003B46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _loading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "Envoyer le code",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  TextButton(
-                    onPressed: () => Navigator.pushNamed(context, '/login'),
-                    child: const Text(
-                      "Retour à la connexion",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_error != null) ...[InlineAlert(message: _error!), const SizedBox(height: AppSpacing.lg)],
+            AppTextField(
+              label: 'Adresse email',
+              controller: _email,
+              hint: 'nom@entreprise.bf',
+              icon: Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+              onSubmitted: (_) => _submit(),
+              validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null,
             ),
-          ),
+            const SizedBox(height: AppSpacing.xl),
+            PrimaryButton(label: 'Envoyer le code', onPressed: _submit, loading: _loading, expand: true),
+          ],
         ),
       ),
     );

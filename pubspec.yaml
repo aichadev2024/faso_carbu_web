@@ -1,5 +1,5 @@
 name: gestionnaire_dashboard
-description: "A new Flutter project."
+description: "FasoCarbu - tableau de bord web du gestionnaire."
 
 publish_to: 'none' 
 
@@ -11,10 +11,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   http: ^0.13.6
   shared_preferences: ^2.1.0
-  intl: ^0.19.0
+  intl: ^0.20.2
   firebase_core: ^2.27.0
   firebase_messaging: ^14.7.0
   firebase_messaging_web: ^3.4.0
@@ -29,6 +31,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^6.0.0
   
 
     

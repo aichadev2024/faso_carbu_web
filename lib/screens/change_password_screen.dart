@@ -1,15 +1,16 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logger/logger.dart';
 
-var logger = Logger();
+import '../core/config/app_config.dart';
+import '../core/session.dart';
+import '../core/widgets/app_widgets.dart';
+import 'main_layout.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  final String token;
-
   const ChangePasswordScreen({super.key, required this.token});
+  final String token;
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -17,186 +18,122 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _ancienController = TextEditingController();
-  final _nouveauController = TextEditingController();
+  final _ancien = TextEditingController();
+  final _nouveau = TextEditingController();
+  final _confirm = TextEditingController();
   bool _loading = false;
-  String? _message;
-  bool _showAncien = false;
-  bool _showNouveau = false;
+  bool _show = false;
+  String? _error;
+  bool _done = false;
 
-  final Color vertPetrole = const Color(0xFF006666); // 💚 couleur principale
+  @override
+  void dispose() {
+    _ancien.dispose();
+    _nouveau.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
 
-  Future<void> _changerMotDePasse() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _loading = true;
-      _message = null;
+      _error = null;
+      _done = false;
     });
-
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email') ?? '';
-
     try {
-      final response = await http.put(
-        Uri.parse(
-          "https://faso-carbu-backend-2.onrender.com/api/auth/changer-mot-de-passe",
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}',
-        },
+      final res = await http.put(
+        Uri.parse('${AppConfig.apiUrl}/auth/changer-mot-de-passe'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${widget.token}'},
         body: jsonEncode({
-          'email': email,
-          'ancienMotDePasse': _ancienController.text,
-          'nouveauMotDePasse': _nouveauController.text,
+          'email': Session.email,
+          'ancienMotDePasse': _ancien.text,
+          'nouveauMotDePasse': _nouveau.text,
         }),
       );
-      logger.i(response.statusCode);
-      logger.i(response.body);
-
-      if (response.statusCode == 200) {
-        setState(() => _message = "✅ Mot de passe modifié avec succès");
-        _ancienController.clear();
-        _nouveauController.clear();
+      if (res.statusCode == 200) {
+        _formKey.currentState!.reset();
+        for (final c in [_ancien, _nouveau, _confirm]) {
+          c.clear();
+        }
+        setState(() => _done = true);
       } else {
-        final msg = jsonDecode(response.body)['message'] ?? 'Erreur inconnue';
-        setState(() => _message = "❌ Échec : $msg");
+        String msg = 'Mot de passe actuel incorrect.';
+        try {
+          msg = jsonDecode(res.body)['message'] ?? msg;
+        } catch (_) {}
+        setState(() => _error = msg);
       }
-    } catch (e) {
-      setState(() => _message = "❌ Erreur réseau : $e");
+    } catch (_) {
+      setState(() => _error = 'Serveur injoignable. Réessayez plus tard.');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Changer le mot de passe"),
-        backgroundColor: vertPetrole,
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 70, color: vertPetrole),
-                  const SizedBox(height: 20),
-                  Text(
-                    "Modification du mot de passe",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: vertPetrole,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Champ ancien mot de passe
-                  TextFormField(
-                    controller: _ancienController,
-                    obscureText: !_showAncien,
-                    decoration: InputDecoration(
-                      labelText: "Ancien mot de passe",
-                      labelStyle: TextStyle(color: vertPetrole),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showAncien ? Icons.visibility_off : Icons.visibility,
-                          color: vertPetrole,
-                        ),
-                        onPressed: () =>
-                            setState(() => _showAncien = !_showAncien),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: vertPetrole, width: 2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    validator: (value) => (value == null || value.length < 4)
-                        ? 'Entrer un mot de passe valide'
-                        : null,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Champ nouveau mot de passe
-                  TextFormField(
-                    controller: _nouveauController,
-                    obscureText: !_showNouveau,
-                    decoration: InputDecoration(
-                      labelText: "Nouveau mot de passe",
-                      labelStyle: TextStyle(color: vertPetrole),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _showNouveau
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: vertPetrole,
-                        ),
-                        onPressed: () =>
-                            setState(() => _showNouveau = !_showNouveau),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: vertPetrole, width: 2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    validator: (value) => (value == null || value.length < 4)
-                        ? 'Mot de passe trop court'
-                        : null,
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  _loading
-                      ? CircularProgressIndicator(color: vertPetrole)
-                      : ElevatedButton.icon(
-                          onPressed: _changerMotDePasse,
-                          icon: const Icon(Icons.check_circle_outline),
-                          label: const Text("Confirmer le changement"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: vertPetrole,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-
-                  if (_message != null) ...[
-                    const SizedBox(height: 20),
-                    Text(
-                      _message!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: _message!.contains("✅")
-                            ? Colors.green
-                            : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ],
+    final toggle = IconButton(
+      icon: Icon(_show ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+      onPressed: () => setState(() => _show = !_show),
+    );
+    return MainLayout(
+      title: 'Mot de passe',
+      jwtToken: widget.token,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const BackLink(label: 'Retour'),
+          const PageHeader(
+            title: 'Changer le mot de passe',
+            subtitle: 'Utilisez au moins 8 caractères, avec des lettres et des chiffres.',
+          ),
+          Form(
+            key: _formKey,
+            child: FormLayout(
+              maxWidth: 520,
+              footer: Align(
+                alignment: Alignment.centerRight,
+                child: PrimaryButton(label: 'Mettre à jour', onPressed: _submit, loading: _loading),
               ),
+              children: [
+                if (_done) const InlineAlert(message: 'Mot de passe modifié avec succès.', tone: Tone.success),
+                if (_error != null) InlineAlert(message: _error!),
+                AppTextField(
+                  label: 'Mot de passe actuel',
+                  controller: _ancien,
+                  required: true,
+                  icon: Icons.lock_outline_rounded,
+                  obscureText: !_show,
+                  suffix: toggle,
+                ),
+                AppTextField(
+                  label: 'Nouveau mot de passe',
+                  controller: _nouveau,
+                  required: true,
+                  icon: Icons.key_outlined,
+                  obscureText: !_show,
+                  validator: (v) {
+                    if (v == null || v.length < 8) return '8 caractères minimum';
+                    if (!RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
+                      return 'Mélangez lettres et chiffres';
+                    }
+                    if (v == _ancien.text) return 'Doit être différent de l\'actuel';
+                    return null;
+                  },
+                ),
+                AppTextField(
+                  label: 'Confirmer le nouveau mot de passe',
+                  controller: _confirm,
+                  required: true,
+                  icon: Icons.key_outlined,
+                  obscureText: !_show,
+                  validator: (v) => v != _nouveau.text ? 'Les mots de passe ne correspondent pas' : null,
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
