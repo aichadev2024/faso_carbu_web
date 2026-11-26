@@ -9,6 +9,8 @@ import '../core/session.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_widgets.dart';
+import '../core/widgets/logo.dart';
+import '../core/widgets/ticket_card.dart';
 import '../services/push_notification_service.dart';
 import 'ForgotPasswordScreen.dart';
 import 'main_layout.dart';
@@ -212,58 +214,103 @@ class _BrandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    Widget feature(IconData icon, String title, String text) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Icon(icon, size: 18, color: AppColors.brandOnDark),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: t.titleMedium?.copyWith(color: Colors.white)),
-                    const SizedBox(height: 2),
-                    Text(text, style: t.bodyMedium?.copyWith(color: AppColors.sidebarText)),
-                  ],
-                ),
-              ),
-            ],
+    Widget feature(IconData icon, String label) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 16, color: AppColors.brandOnDark),
+            const SizedBox(width: 8),
+            Text(label, style: t.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85))),
+          ]),
         );
 
+    final exemple = TicketData(
+      id: '128',
+      statut: 'EN_ATTENTE',
+      quantite: 40,
+      montant: 32800,
+      carburant: 'Gasoil',
+      station: 'Station partenaire',
+      beneficiaire: 'Votre chauffeur',
+      dateEmission: DateTime.now(),
+    );
+
     return Container(
-      color: AppColors.sidebar,
-      padding: const EdgeInsets.all(56),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: const BoxDecoration(gradient: inkGradient),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          const BrandMark(onDark: true),
-          const Spacer(),
-          Text(
-            'Le carburant de votre flotte,\nsous contrôle.',
-            style: t.displaySmall?.copyWith(color: Colors.white, fontSize: 34, height: 1.2),
+          Positioned(
+            right: -120,
+            top: -120,
+            child: Container(
+              width: 420,
+              height: 420,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [AppColors.brand.withValues(alpha: 0.40), AppColors.brand.withValues(alpha: 0)]),
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Demandes, tickets QR et consommations réunis dans un seul tableau de bord.',
-            style: t.bodyLarge?.copyWith(color: AppColors.sidebarText),
+          Positioned(
+            left: -80,
+            bottom: -140,
+            child: Opacity(opacity: 0.06, child: LogoMark(size: 360, withBackground: false, color: Colors.white)),
           ),
-          const SizedBox(height: 48),
-          feature(Icons.assignment_turned_in_outlined, 'Validation des demandes', 'Approuvez ou rejetez les demandes de vos équipes en un clic.'),
-          feature(Icons.qr_code_2_rounded, 'Tickets sécurisés', 'Chaque ticket génère un QR code vérifié en station.'),
-          feature(Icons.insights_rounded, 'Suivi des consommations', 'Rapports par chauffeur, véhicule et période.'),
-          const Spacer(),
-          Text('© ${DateTime.now().year} FasoCarbu', style: t.bodySmall?.copyWith(color: AppColors.textMutedDark)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(56, 48, 56, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Logo(size: 40, onDark: true, tagline: 'Gestion du carburant'),
+                const Spacer(),
+                Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: 'Le carburant de votre flotte,\n'),
+                    TextSpan(text: 'sous contrôle.', style: TextStyle(color: AppColors.brandOnDark)),
+                  ]),
+                  style: t.displaySmall?.copyWith(color: Colors.white, fontSize: 38, height: 1.15),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Text(
+                    'Demandes, tickets QR et consommations réunis dans un seul tableau de bord, '
+                    'pour vos équipes comme pour les stations partenaires.',
+                    style: t.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.68), height: 1.5),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  feature(Icons.task_alt_rounded, 'Validation en un clic'),
+                  feature(Icons.qr_code_2_rounded, 'Tickets QR sécurisés'),
+                  feature(Icons.insights_rounded, 'Rapports détaillés'),
+                ]),
+                const SizedBox(height: 40),
+                // Aperçu d'un ticket, légèrement incliné.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Transform.rotate(
+                    angle: -0.045,
+                    child: Container(
+                      width: 360,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 40, offset: const Offset(0, 20))],
+                      ),
+                      child: Theme(data: AppTheme.light(), child: TicketCard(data: exemple, compact: true)),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text('© ${DateTime.now().year} FasoCarbu', style: t.bodySmall?.copyWith(color: AppColors.textMutedDark)),
+              ],
+            ),
+          ),
         ],
       ),
     );
