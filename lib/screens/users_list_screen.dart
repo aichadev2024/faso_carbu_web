@@ -86,6 +86,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Gestion',
+            icon: Icons.group_rounded,
             title: 'Utilisateurs',
             subtitle: 'Demandeurs, chauffeurs et personnel de station de votre entreprise.',
             actions: [

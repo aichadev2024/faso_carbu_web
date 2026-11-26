@@ -95,6 +95,8 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PageHeader(
+              eyebrow: 'Pilotage',
+              icon: Icons.assignment_rounded,
               title: 'Demandes de carburant',
               subtitle: 'Validez ou rejetez les demandes de vos équipes.',
               actions: [
@@ -111,18 +113,16 @@ class _DemandeListScreenState extends State<DemandeListScreen> {
               runSpacing: AppSpacing.sm,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                for (final f in [
-                  ('TOUTES', 'Toutes', all.length),
-                  ('EN_ATTENTE', 'En attente', count('EN_ATTENTE')),
-                  ('VALIDEE', 'Validées', count('VALIDEE')),
-                  ('REJETEE', 'Rejetées', count('REJETEE')),
-                ])
-                  ChoiceChip(
-                    label: Text('${f.$2}  ${f.$3}'),
-                    selected: _filter == f.$1,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _filter = f.$1),
-                  ),
+                FilterPills<String>(
+                  options: [
+                    ('TOUTES', 'Toutes', all.length),
+                    ('EN_ATTENTE', 'En attente', count('EN_ATTENTE')),
+                    ('VALIDEE', 'Validées', count('VALIDEE')),
+                    ('REJETEE', 'Rejetées', count('REJETEE')),
+                  ],
+                  selected: _filter,
+                  onChanged: (v) => setState(() => _filter = v),
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 SearchField(
                   hint: 'Demandeur, station, véhicule…',

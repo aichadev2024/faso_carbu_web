@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../core/session.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_widgets.dart';
+import '../core/widgets/logo.dart';
+import '../core/theme/app_colors.dart';
 import '../models/station.dart';
 import '../providers/station_provider.dart';
 import 'main_layout.dart';
@@ -82,6 +84,8 @@ class _StationListScreenState extends State<StationListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Gestion',
+            icon: Icons.local_gas_station_rounded,
             title: 'Stations partenaires',
             subtitle: provider.stations.isEmpty
                 ? 'Les stations où vos chauffeurs peuvent utiliser leurs tickets.'
@@ -134,56 +138,88 @@ class _StationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Bandeau de la carte : pictogramme, statut et actions.
+          Container(
+            height: 76,
+            padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
+            decoration: const BoxDecoration(gradient: inkGradient),
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Tone.brand.softBg(context),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(Icons.local_gas_station_rounded, size: 20, color: Tone.brand.fg),
+                const Positioned(
+                  right: 40,
+                  bottom: -22,
+                  child: Opacity(opacity: 0.10, child: LogoMark(size: 80, withBackground: false, color: Colors.white)),
                 ),
-                const Spacer(),
-                StatusBadge(
-                  label: station.actif ? 'Active' : 'Inactive',
-                  tone: station.actif ? Tone.success : Tone.neutral,
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Actions',
-                  icon: const Icon(Icons.more_vert_rounded, size: 20),
-                  onSelected: (v) => v == 'delete' ? onDelete() : null,
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Supprimer', style: TextStyle(color: Tone.danger.fg)),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(gradient: brandGradient, borderRadius: BorderRadius.circular(AppRadius.md)),
+                      child: const Icon(Icons.local_gas_station_rounded, size: 21, color: Colors.white),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (station.actif ? AppColors.success : AppColors.textMutedDark).withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        station.actif ? 'Active' : 'Inactive',
+                        style: t.labelMedium?.copyWith(
+                          color: station.actif ? const Color(0xFF86EFAC) : Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Actions',
+                      icon: const Icon(Icons.more_vert_rounded, size: 20, color: Colors.white70),
+                      onSelected: (v) => v == 'delete' ? onDelete() : null,
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Supprimer', style: TextStyle(color: Tone.danger.fg)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(station.nom, style: t.titleMedium),
-            const SizedBox(height: AppSpacing.xs),
-            Row(children: [
-              Icon(Icons.place_outlined, size: 16, color: t.bodySmall?.color),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  [station.adresse, station.ville].where((e) => e.isNotEmpty).join(', '),
-                  style: t.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ]),
-          ],
-        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(station.nom, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Icon(Icons.place_outlined, size: 16, color: t.bodySmall?.color),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      station.adresse.isEmpty ? 'Adresse non renseignée' : station.adresse,
+                      style: t.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+                if (station.ville.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  StatusBadge(label: station.ville, tone: Tone.brand),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

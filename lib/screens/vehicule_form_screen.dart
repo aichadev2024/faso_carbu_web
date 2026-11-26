@@ -111,6 +111,8 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
         children: [
           const BackLink(label: 'Véhicules'),
           PageHeader(
+            eyebrow: 'Véhicules',
+            icon: Icons.directions_car_rounded,
             title: title,
             subtitle: 'Le quota définit le volume mensuel autorisé pour ce véhicule.',
           ),

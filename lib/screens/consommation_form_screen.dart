@@ -108,6 +108,8 @@ class _ConsommationFormScreenState extends State<ConsommationFormScreen> {
         children: [
           const BackLink(label: 'Consommations'),
           const PageHeader(
+            eyebrow: 'Consommations',
+            icon: Icons.local_drink_rounded,
             title: 'Saisir une consommation',
             subtitle: 'Indiquez le carburant réellement utilisé sur une attribution.',
           ),

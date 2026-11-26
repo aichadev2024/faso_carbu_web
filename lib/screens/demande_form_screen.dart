@@ -99,6 +99,8 @@ class _DemandeFormScreenState extends State<DemandeFormScreen> {
         children: [
           const BackLink(label: 'Demandes'),
           const PageHeader(
+            eyebrow: 'Demandes',
+            icon: Icons.add_task_rounded,
             title: 'Nouvelle demande',
             subtitle: 'Demandez du carburant pour un véhicule et un chauffeur.',
           ),

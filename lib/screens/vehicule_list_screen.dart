@@ -96,6 +96,8 @@ class _VehiculeListScreenState extends State<VehiculeListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Gestion',
+            icon: Icons.directions_car_rounded,
             title: 'Flotte de véhicules',
             subtitle: provider.vehicules.isEmpty
                 ? 'Les véhicules pour lesquels vos équipes demandent du carburant.'

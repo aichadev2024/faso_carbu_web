@@ -93,6 +93,8 @@ class _StationFormScreenState extends State<StationFormScreen> {
         children: [
           const BackLink(label: 'Stations'),
           const PageHeader(
+            eyebrow: 'Stations',
+            icon: Icons.add_business_rounded,
             title: 'Nouvelle station',
             subtitle: 'Ajoutez une station partenaire et le compte de son administrateur.',
           ),
