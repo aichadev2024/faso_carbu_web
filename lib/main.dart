@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/session.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'firebase_options.dart';
 import 'providers/carburant_provider.dart';
 import 'providers/demande_provider.dart';
@@ -38,6 +39,7 @@ Future<void> main() async {
     debugPrint('Firebase indisponible : $e');
   }
   await Session.load();
+  await ThemeController.load();
 
   runApp(
     MultiProvider(
@@ -61,23 +63,26 @@ class FasoCarbuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FasoCarbu · Gestionnaire',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.light,
-      locale: const Locale('fr', 'FR'),
-      supportedLocales: const [Locale('fr', 'FR')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      // L'URL du navigateur (#/demandes...) ouvre directement la bonne page,
-      // y compris après un rafraîchissement.
-      onGenerateInitialRoutes: (name) => [_onGenerateRoute(RouteSettings(name: name))],
-      onGenerateRoute: _onGenerateRoute,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.mode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'FasoCarbu · Gestionnaire',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: mode,
+        locale: const Locale('fr', 'FR'),
+        supportedLocales: const [Locale('fr', 'FR')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        // L'URL du navigateur (#/demandes...) ouvre directement la bonne page,
+        // y compris après un rafraîchissement.
+        onGenerateInitialRoutes: (name) => [_onGenerateRoute(RouteSettings(name: name))],
+        onGenerateRoute: _onGenerateRoute,
+      ),
     );
   }
 
@@ -91,9 +96,7 @@ class FasoCarbuApp extends StatelessWidget {
 
     // Le token vient des arguments si fournis, sinon de la session
     // (indispensable après un rafraîchissement de la page web).
-    final passed = settings.arguments is Map<String, dynamic>
-        ? settings.arguments as Map<String, dynamic>
-        : const <String, dynamic>{};
+    final passed = settings.arguments is Map<String, dynamic> ? settings.arguments as Map<String, dynamic> : const <String, dynamic>{};
     final args = {...Session.routeArgs, ...passed};
     final token = (args['jwtToken'] as String?)?.isNotEmpty == true ? args['jwtToken'] as String : Session.token;
     final routeSettings = RouteSettings(name: name, arguments: args);
@@ -127,7 +130,9 @@ class FasoCarbuApp extends StatelessWidget {
       case '/consommations':
         page = ConsommationScreen();
       case '/rapports':
-        page = RapportScreen(service: RapportService(baseUrl: AppConfig.backendUrl, token: token));
+        page = RapportScreen(
+          service: RapportService(baseUrl: AppConfig.backendUrl, token: token),
+        );
       case '/profil':
         page = ProfilScreen(jwtToken: token, userId: (args['userId'] as String?) ?? Session.userId);
       case '/change-password':
