@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/session.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/app_widgets.dart';
+import '../core/widgets/ticket_card.dart';
 import '../models/ticket.dart';
 import '../models/user.dart';
 import '../providers/user_provider.dart';
@@ -112,45 +112,46 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   void _showQr(Ticket t) {
+    final data = TicketData(
+      id: t.id?.toString(),
+      statut: t.statut,
+      quantite: t.quantite,
+      montant: t.somme ?? t.montant,
+      carburant: t.carburantNom,
+      station: t.stationNom,
+      vehicule: t.vehiculeImmatriculation,
+      beneficiaire: _beneficiaire(t),
+      entreprise: t.entrepriseNom,
+      validateur: '${t.validateurPrenom ?? ''} ${t.validateurNom ?? ''}'.trim(),
+      dateEmission: t.dateEmission,
+      dateValidation: t.dateValidation,
+      codeQr: t.codeQr,
+    );
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Ticket #${t.id}'),
-        content: SizedBox(
-          width: 320,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: Theme.of(ctx).dividerColor),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.all(AppSpacing.lg),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton.filledTonal(
+                  tooltip: 'Fermer',
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close_rounded),
                 ),
-                child: QrImageView(data: t.codeQr!, size: 220),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _kv(ctx, 'Bénéficiaire', _beneficiaire(t)),
-              _kv(ctx, 'Carburant', '${formatNumber(t.quantite)} L · ${t.carburantNom ?? '—'}'),
-              _kv(ctx, 'Station', t.stationNom ?? '—'),
-              _kv(ctx, 'Montant', '${formatNumber(t.somme ?? t.montant)} FCFA'),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+                TicketCard(data: data),
+              ],
+            ),
           ),
         ),
-        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer'))],
       ),
-    );
-  }
-
-  Widget _kv(BuildContext context, String k, String v) {
-    final t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(children: [
-        Expanded(child: Text(k, style: t.bodyMedium)),
-        Text(v.isEmpty ? '—' : v, style: t.titleSmall),
-      ]),
     );
   }
 
