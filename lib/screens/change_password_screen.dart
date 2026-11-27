@@ -85,6 +85,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         children: [
           const BackLink(label: 'Retour'),
           const PageHeader(
+            eyebrow: 'Mon compte',
+            icon: Icons.lock_reset_rounded,
             title: 'Changer le mot de passe',
             subtitle: 'Utilisez au moins 8 caractères, avec des lettres et des chiffres.',
           ),

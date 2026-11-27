@@ -170,6 +170,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Pilotage',
+            icon: Icons.confirmation_number_rounded,
             title: 'Tickets carburant',
             subtitle: 'Tickets émis après validation des demandes, avec leur QR code.',
             actions: [
@@ -194,13 +196,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
             runSpacing: AppSpacing.sm,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              for (final f in [('TOUS', 'Tous'), ('EN_ATTENTE', 'En attente'), ('VALIDER', 'Validés'), ('CONSOMMEE', 'Consommés'), ('REJETER', 'Rejetés')])
-                ChoiceChip(
-                  label: Text(f.$2),
-                  selected: _filter == f.$1,
-                  showCheckmark: false,
-                  onSelected: (_) => setState(() => _filter = f.$1),
-                ),
+              FilterPills<String>(
+                options: [
+                  ('TOUS', 'Tous', _tickets.length),
+                  ('EN_ATTENTE', 'En attente', count('EN_ATTENTE')),
+                  ('VALIDER', 'Validés', count('VALIDER')),
+                  ('CONSOMMEE', 'Consommés', count('CONSOMMEE')),
+                  ('REJETER', 'Rejetés', count('REJETER')),
+                ],
+                selected: _filter,
+                onChanged: (v) => setState(() => _filter = v),
+              ),
               const SizedBox(width: AppSpacing.sm),
               SearchField(hint: 'Bénéficiaire, station…', onChanged: (v) => setState(() => _search = v)),
             ],

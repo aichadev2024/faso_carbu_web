@@ -78,6 +78,8 @@ class _ConsommationScreenState extends State<ConsommationScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Pilotage',
+            icon: Icons.local_drink_rounded,
             title: 'Consommations',
             subtitle: 'Carburant effectivement utilisé sur les attributions.',
             actions: [

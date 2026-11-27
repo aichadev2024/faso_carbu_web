@@ -97,6 +97,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
         children: [
           const BackLink(label: 'Utilisateurs'),
           PageHeader(
+            eyebrow: 'Utilisateurs',
+            icon: Icons.person_add_alt_1_rounded,
             title: title,
             subtitle: _isEdit
                 ? 'Mettez à jour les informations de ${widget.existing!.prenom} ${widget.existing!.nom}.'

@@ -127,6 +127,8 @@ class _RapportScreenState extends State<RapportScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
+            eyebrow: 'Pilotage',
+            icon: Icons.insert_chart_rounded,
             title: 'Rapports',
             subtitle: 'Analysez les tickets par chauffeur et exportez les consommations.',
             actions: [
